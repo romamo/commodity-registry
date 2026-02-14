@@ -1,9 +1,9 @@
-from enum import StrEnum
+from enum import Enum
 
 from pydantic import BaseModel, Field, field_validator
 
 
-class InstrumentType(StrEnum):
+class InstrumentType(str, Enum):
     ETF = "ETF"
     ETC = "ETC"
     ETN = "ETN"
@@ -14,7 +14,7 @@ class InstrumentType(StrEnum):
     CASH = "Cash"
 
 
-class AssetClass(StrEnum):
+class AssetClass(str, Enum):
     EQUITY_ETF = "EquityETF"
     FIXED_INCOME_ETF = "FixedIncomeETF"
     COMMODITY_ETF = "CommodityETF"
@@ -25,14 +25,14 @@ class AssetClass(StrEnum):
     COMMODITY = "Commodity"
 
 
-class RiskProfile(StrEnum):
+class RiskProfile(str, Enum):
     LOW = "Low"
     MEDIUM = "Medium"
     HIGH = "High"
     SPECULATIVE = "Speculative"
 
 
-class Liquidity(StrEnum):
+class Liquidity(str, Enum):
     INSTANT = "Instant"
     T_PLUS_2 = "T+2"
     LOCKED = "Locked"
