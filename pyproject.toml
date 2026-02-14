@@ -1,12 +1,12 @@
 [project]
 name = "commodity-registry"
-version = "0.1.1"
+version = "0.1.2"
 description = "Single source of truth for financial instrument data"
 authors = [
     { name = "Roman Medvedev", email = "pypi@romavm.dev" }
 ]
 license = "MIT"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2.0",
     "pyyaml>=6.0",
@@ -45,7 +45,7 @@ include = ["src/commodity_registry"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
