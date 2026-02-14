@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Commodity Registry",
+  "type": "object",
+  "properties": {
+    "commodities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "instrument_type", "asset_class", "currency"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9\\\\._-]*$",
+            "description": "Canonical Beancount commodity name"
+          },
+          "isin": { "type": "string", "pattern": "^[A-Z]{2}[A-Z0-9]{9}\\d$" },
+          "figi": { "type": "string" },
+          "instrument_type": {
+            "type": "string",
+            "enum": ["ETF", "ETC", "ETN", "Stock", "Index", "Future", "Crypto", "Cash"]
+          },
+          "asset_class": {
+            "type": "string",
+            "enum": ["EquityETF", "FixedIncomeETF", "CommodityETF", "MoneyMarketETF", "Stock", "Cash", "Crypto", "Commodity"]
+          },
+          "currency": { "type": "string" },
+          "issuer": { "type": "string" },
+          "underlying": { "type": "string" },
+          "tickers": {
+            "type": "object",
+            "properties": {
+              "yahoo": { "type": "string" },
+              "ft": { "type": "string", "description": "Financial Times ticker" },
+              "google": { "type": "string" }
+            }
+          },
+          "validation_points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["date", "price"],
+              "properties": {
+                "date": { "type": "string", "format": "date" },
+                "price": {
+                  "type": "number",
+                  "description": "Expected price on that date. Verification passes if this price is within the intraday High-Low range."
+                }
+              }
+            }
+          },
+          "provider": { "type": "string" },
+          "risk_profile": {
+            "type": "string",
+            "enum": ["Low", "Medium", "High", "Speculative"]
+          },
+          "liquidity": {
+            "type": "string",
+            "enum": ["Instant", "T+2", "Locked"]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

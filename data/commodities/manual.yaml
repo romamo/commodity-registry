@@ -1,0 +1,29 @@
+commodities:
+- name: CSPX
+  isin: IE00B5BMR087
+  instrument_type: ETF
+  asset_class: EquityETF
+  currency: USD
+  tickers:
+    yahoo: CSPX.L
+- name: SXR8
+  isin: IE00B5BMR087
+  instrument_type: ETF
+  asset_class: EquityETF
+  currency: EUR
+  tickers:
+    yahoo: SXR8.DE
+- name: AAPL
+  isin: US0378331005
+  instrument_type: Stock
+  asset_class: Stock
+  currency: USD
+  tickers:
+    yahoo: AAPL
+- name: X.4GLD
+  isin: DE000A0S9GB0
+  instrument_type: ETF
+  asset_class: EquityETF
+  currency: EUR
+  tickers:
+    ft: 4GLD:GER:EUR

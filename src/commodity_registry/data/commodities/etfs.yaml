@@ -1,0 +1,14 @@
+commodities:
+  - name: "X4GLD"
+    isin: "DE000A0S9GB0"
+    instrument_type: "ETC"
+    asset_class: "CommodityETF"
+    underlying: "Gold"
+    issuer: "Deutsche Börse Commodities"
+    currency: "EUR"
+    tickers:
+      yahoo: "4GLD.DE"
+    figi: "BBG003BJ4NB2"
+    validation_points:
+      - date: "2025-01-10"
+        price: 84.0
