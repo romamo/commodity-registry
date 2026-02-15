@@ -101,33 +101,32 @@ class CommodityRegistry:
                         self._by_ticker[f"{provider.upper()}:{ticker.upper()}"] = c
 
     def find_by_isin(self, isin: str, currency: str | None = None) -> Commodity | None:
-        matches = self.find_candidates(isin, currency)
+        matches = self.find_candidates(SecurityCriteria(isin=isin, currency=currency))
         return matches[0] if matches else None
 
-    def find_candidates(self, token: str, currency: str | None = None) -> list[Commodity]:
+    def find_candidates(self, criteria: SecurityCriteria) -> list[Commodity]:
         """
-        Finds all commodities matching a token (ISIN, Name, FIGI).
-        If currency is provided, filters the results.
+        Finds all commodities matching the criteria using strict field lookups.
         Returns empty list if no match.
         """
-        if not token:
-            return []
-
-        token = token.upper()
         candidates = []
 
-        # 1. Try ISIN
-        candidates.extend(self._by_isin.get(token, []))
+        # 1. Try ISIN (Strict)
+        if criteria.isin:
+            candidates.extend(self._by_isin.get(criteria.isin.upper(), []))
 
-        # 2. Try Name
-        if token in self._by_name:
-            candidates.append(self._by_name[token])
+        # 2. Try Name/Symbol (Strict)
+        if criteria.symbol:
+            sym_upper = criteria.symbol.upper()
+            if sym_upper in self._by_name:
+                candidates.append(self._by_name[sym_upper])
 
-        # 3. Try FIGI
-        if token in self._by_figi:
-            candidates.append(self._by_figi[token])
+        # 3. Try FIGI (Strict)
+        # Note: FIGI lookup isn't explicitly in SecurityCriteria yet, but we have it in index.
+        # We can add it if needed or skip for now. 
+        # For now, we follow the criteria fields.
 
-        # Deduplicate (by object id or name)
+        # Deduplicate (by name)
         seen = set()
         unique_candidates = []
         for c in candidates:
@@ -135,8 +134,9 @@ class CommodityRegistry:
                 unique_candidates.append(c)
                 seen.add(c.name)
 
-        if currency:
-            currency = currency.upper()
+        # 4. Filter by Currency if provided
+        if criteria.currency:
+            currency = criteria.currency.upper()
             unique_candidates = [c for c in unique_candidates if c.currency.upper() == currency]
 
         return unique_candidates
@@ -174,7 +174,7 @@ def add_commodity(
     """
     Adds a new commodity to the registry.
 
-    Uses SecurityCriteria.symbol (from IBKR's underlyingSymbol or symbol field).
+    Uses SecurityCriteria.symbol (the raw token or security symbol).
     Extracts base ticker (before ':') for Beancount name.
     Stores provider-specific tickers only if found online.
     """

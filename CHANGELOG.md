@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7] - 2026-02-15
+
+### Added
+- **Unified Security Resolution**: Introduced `resolve_security` in `finder.py` as a single entry point for resolving any instrument (Stocks, ETFs, Currencies) across Registry, FX, and Online sources.
+- **Strict Field Lookup**: Refactored `CommodityRegistry` to use `SecurityCriteria` for targeted searching by ISIN, Symbol, or FIGI, improving accuracy over generic string matching.
+
+### Changed
+- CLI Harmonization: All CLI commands (`resolve`, `fetch`, `add`) now build and use `SecurityCriteria` for consistent data modeling.
+- ISIN Heuristic: Improved ISIN detection in the CLI by requiring a minimum length of 12 characters, preventing misidentification of standard FX symbols.
+
 ## [0.1.6] - 2026-02-15
 
 ### Added

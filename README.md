@@ -111,31 +111,6 @@ comm = reg.find_by_ticker("yahoo", "AAPL")
 ```
 
 
-## Programmatic Usage
-
-You can use the registry in your Python scripts:
-
-```python
-from commodity_registry.registry import get_registry
-
-# Initialize registry (loads bundled data + user data from env var)
-reg = get_registry()
-
-# 1. Resolve by ISIN
-commodity = reg.find_by_isin("US0378331005")
-if commodity:
-    print(f"Name: {commodity.name}, Currency: {commodity.currency}")
-
-# 2. Search by any token (ISIN, Name, FIGI)
-candidates = reg.find_candidates("AAPL")
-for c in candidates:
-    print(f"Found: {c.name} ({c.isin})")
-
-# 3. Look up by ticker
-# Note: Ticker lookup requires the provider name
-comm = reg.find_by_ticker("yahoo", "AAPL")
-```
-
 ## Data Format (YAML)
 
 ```yaml

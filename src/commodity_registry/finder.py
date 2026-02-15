@@ -175,6 +175,57 @@ def resolve_currency(
     )
 
 
+
+def resolve_security(
+    criteria: SecurityCriteria, verify: bool = False, registry=None
+) -> SearchResult | None:
+    """
+    Unified security resolution routine.
+    1. Check Registry (Strict fields)
+    2. Try Programmatic Currency Resolution (if it looks like a pair)
+    3. Perform Online Search (ISIN then Symbol)
+    """
+    # 1. Registry Match (Final Truth)
+    if registry:
+        candidates = registry.find_candidates(criteria)
+        if candidates:
+            cand = candidates[0]
+            # Convert Commodity to SearchResult
+            best_ticker = None
+            source = "yahoo"
+            if cand.tickers:
+                if cand.tickers.yahoo:
+                    best_ticker = cand.tickers.yahoo
+                    source = "yahoo"
+                elif cand.tickers.ft:
+                    best_ticker = cand.tickers.ft
+                    source = "ft"
+                elif cand.tickers.google:
+                    best_ticker = cand.tickers.google
+                    source = "google"
+            
+            return SearchResult(
+                provider=source,
+                ticker=best_ticker or cand.name,
+                name=cand.name,
+                currency=cand.currency
+            )
+
+    # 2. Programmatic FX Resolution
+    if criteria.symbol:
+        # Check if it looks like a currency pair
+        fx_res = resolve_currency(criteria.symbol, verify=verify)
+        if fx_res:
+            return fx_res
+
+    # 3. Online Search
+    results = search_isin(criteria)
+    if results:
+        return results[0]
+
+    return None
+
+
 def fetch_price(ticker: str, provider: str = "yahoo") -> float | None:
     """
     Fetches the current real-time/delayed price for a ticker.
