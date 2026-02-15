@@ -40,6 +40,14 @@ commodity-reg resolve US0378331005
 # Output: Resolved: AAPL
 ```
 
+### Automatic Currency Resolution
+The registry programmatically resolves standard currencies to Yahoo tickers if they are not in your custom registry:
+- `resolve EUR` -> `EURUSD=X`
+- `resolve EUR/JPY` -> `EURJPY=X`
+- `resolve USD/JPY` -> `JPY=X`
+
+This eliminates the need to manually define standard Forex pairs in your registry files.
+
 With price verification (checks if price matches historical data):
 ```bash
 commodity-reg resolve US0378331005 --date 2024-01-01 --price 185.00

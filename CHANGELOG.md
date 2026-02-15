@@ -5,13 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.5] - 2026-02-15
+## [0.1.6] - 2026-02-15
 
 ### Added
+- Programmatic Currency Resolution: Integrated smart lookup logic in `finder.py` to automatically resolve standard currencies to Yahoo tickers (e.g. `EUR` -> `EURUSD=X`).
+- **Live Verification**: Programmatic currency hits are now verified against the live provider to ensure "True Truth" resolution.
+- Currency Pair Support: Added parsing for composite pair strings like `EURUSD`, `EUR/JPY`, and `EUR-USD`.
+- CLI Price Fetch: Added `--price` flag to the `fetch` command to retrieve the latest market price.
 - Recursive directory scanning: `load_path` now recursively finds all `.yaml`/`.yml` files.
-- Dynamic provider discovery: `finder.py` now dynamically detects available providers (`py-yfinance`, `py-ftmarkets`).
-- Caching: Integrated `diskcache` to cache external metadata requests for 24 hours.
-- Validation: Added strict ISIN validation (Luhn algorithm) to `Commodity` model.
+- Dynamic provider discovery: Dynamically detects available providers (`py-yfinance`, `py-ftmarkets`).
+- Caching: Integrated `diskcache` for 24-hour metadata caching.
 
 ### Changed
 - `CLI`: Updated help text and logic to use dynamic provider list.

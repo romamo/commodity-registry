@@ -39,6 +39,25 @@ def resolve_cmd(args):
                     break
 
     if not candidates:
+        # Try programmatic currency resolution
+        from .finder import resolve_currency
+        target_curr = args.currency or "USD"
+        
+        res = resolve_currency(args.token, target_currency=target_curr, verify=True)
+        if res:
+             from .models import Commodity, InstrumentType, AssetClass, Tickers
+             c = Commodity(
+                name=res.name,
+                isin=None,
+                instrument_type=InstrumentType.CASH,
+                asset_class=AssetClass.CASH,
+                currency=res.currency,
+                tickers=Tickers(yahoo=res.ticker)
+             )
+             print(f"  [AUTO] Programmatically resolved to {res.ticker} ({res.provider})")
+             candidates.append(c)
+
+    if not candidates:
         print(f"Could not resolve '{args.token}'")
         sys.exit(1)
 
@@ -75,7 +94,20 @@ def resolve_cmd(args):
         # No verification requested, pick the first candidate
         resolved_commodity = candidates[0]
 
-    print(f"Resolved: {resolved_commodity.name}")
+    # Determine which ticker/provider to display
+    best_ticker = "N/A"
+    best_provider = "REGISTRY"
+    
+    if resolved_commodity.tickers:
+        t = resolved_commodity.tickers
+        if t.yahoo:
+            best_ticker = t.yahoo
+            best_provider = "yahoo"
+        elif t.ft:
+            best_ticker = t.ft
+            best_provider = "ft"
+
+    print(f"Resolved: {resolved_commodity.name} -> {best_ticker} ({best_provider})")
 
 
 def lint_cmd(args):
@@ -338,42 +370,6 @@ def add_cmd(args):
         sys.exit(1)
 
 
-def fetch_cmd(args):
-    """Searches for a security across providers and prints found details."""
-    from .finder import fetch_metadata, search_isin
-
-    if args.isin:
-        print(f"Searching for ISIN: {args.isin}...")
-        from pydantic_market_data.models import SecurityCriteria
-
-        criteria = SecurityCriteria(isin=args.isin)
-        results = search_isin(criteria)
-        if not results:
-            print("No results found.")
-            return
-
-        print("\nFound Identifiers:")
-        for res in results:
-            print(f"- [{res.provider.upper()}]")
-            print(f"  Ticker:   {res.ticker}")
-            print(f"  Name:     {res.name}")
-            print(f"  Currency: {res.currency}")
-    elif args.ticker:
-        from .finder import get_available_providers
-
-        for p in get_available_providers():
-            print(f"\nChecking [{p.upper()}] for {args.ticker}...")
-            data = fetch_metadata(args.ticker, provider=p)
-            if data:
-                print(f"  Name:     {data.get('name')}")
-                print(f"  Currency: {data.get('currency')}")
-            else:
-                print("  Not found.")
-    else:
-        print("Please provide --isin or --ticker")
-        sys.exit(1)
-
-
 def main():
     default_reg_path = os.getenv("PATH_COMMODITY_REGISTRY", "data/commodities/")
     parser = argparse.ArgumentParser(description="Commodity Registry CLI")
@@ -425,6 +421,7 @@ def main():
     p_fetch = subparsers.add_parser("fetch", help="Fetch/Discover security details online")
     p_fetch.add_argument("--isin", help="ISIN to search for")
     p_fetch.add_argument("--ticker", help="Ticker to fetch metadata for")
+    p_fetch.add_argument("--price", action="store_true", help="Fetch latest market price")
 
     args = parser.parse_args()
 
@@ -436,6 +433,66 @@ def main():
         add_cmd(args)
     elif args.command == "fetch":
         fetch_cmd(args)
+
+def fetch_cmd(args):
+    """Searches for a security across providers and prints found details."""
+    from .finder import fetch_metadata, search_isin, fetch_price
+
+    if args.isin:
+        print(f"Searching for ISIN: {args.isin}...")
+        from pydantic_market_data.models import SecurityCriteria
+
+        criteria = SecurityCriteria(isin=args.isin)
+        results = search_isin(criteria)
+        if not results:
+            print("No results found.")
+            return
+
+        print("\nFound Identifiers:")
+        for res in results:
+            print(f"- [{res.provider.upper()}]")
+            print(f"  Ticker:   {res.ticker}")
+            print(f"  Name:     {res.name}")
+            print(f"  Currency: {res.currency}")
+            
+            if args.price and res.ticker:
+                price = fetch_price(res.ticker, provider=res.provider)
+                if price:
+                    print(f"  Price:    {price}")
+                else:
+                    print("  Price:    [Unavailable]")
+
+    elif args.ticker:
+        from .finder import get_available_providers, resolve_currency
+
+        # Smart Ticker: If it looks like a currency pair (e.g. EURUSD, EUR/USD), resolve to proper ticker (EURUSD=X)
+        res = resolve_currency(args.ticker, verify=True)
+        effective_ticker = res.ticker if res else args.ticker
+        
+        if res and args.ticker != res.ticker:
+             print(f"  [AUTO] Resolved '{args.ticker}' to '{res.ticker}' ({res.provider})")
+             providers_to_check = [res.provider]
+        else:
+             providers_to_check = get_available_providers()
+
+        for p in providers_to_check:
+            print(f"\nChecking [{p.upper()}] for {effective_ticker}...")
+            data = fetch_metadata(effective_ticker, provider=p)
+            if data:
+                print(f"  Name:     {data.get('name')}")
+                print(f"  Currency: {data.get('currency')}")
+                
+                if args.price:
+                    price = fetch_price(effective_ticker, provider=p)
+                    if price:
+                        print(f"  Price:    {price}")
+                    else:
+                        print("  Price:    [Unavailable]")
+            else:
+                print("  Not found.")
+    else:
+        print("Please provide --isin or --ticker")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

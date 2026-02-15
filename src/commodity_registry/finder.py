@@ -109,3 +109,85 @@ def verify_ticker(ticker: str, date: str, price: float, provider: str = "yahoo")
     except Exception as e:
         logger.error(f"Error verifying ticker {ticker} on {date} via {provider}: {e}")
         return False
+
+
+def resolve_currency(
+    symbol: str, target_currency: str = "USD", verify: bool = False
+) -> "SearchResult | None":
+    """
+    Programmatically resolves standard currencies to Yahoo tickers (e.g. EUR -> EURUSD=X).
+    Supports pairs strings like 'EURUSD', 'EUR/USD', 'EUR-USD'.
+    If verify=True, performs a live lookup to ensure the ticker exists.
+    Returns a SearchResult or None if not a valid currency pair or not found.
+    """
+    if not symbol:
+        return None
+        
+    base = symbol.upper()
+    quote = target_currency.upper()
+    
+    # Handle composite inputs (e.g. "EURUSD", "EUR/USD")
+    if len(base) == 6 and base.isalpha():
+        # "EURUSD" -> base=EUR, quote=USD
+        quote = base[3:]
+        base = base[:3]
+    elif "/" in base:
+        parts = base.split("/")
+        if len(parts) == 2:
+            base = parts[0]
+            quote = parts[1]
+    elif "-" in base:
+        parts = base.split("-")
+        if len(parts) == 2:
+            base = parts[0]
+            quote = parts[1]
+
+    # Validate lengths and characters (must be 3 alphabetic letters each)
+    if len(base) != 3 or len(quote) != 3 or not base.isalpha() or not quote.isalpha():
+        return None
+        
+    if base == quote:
+        return None
+        
+    # 1. Target is USD (e.g. EUR in USD -> EURUSD=X)
+    if quote == "USD":
+        ticker = f"{base}USD=X"
+        
+    # 2. Symbol is USD (e.g. USD in EUR -> EUR=X)
+    # Yahoo convention: "{CURRENCY}=X" usually means "USD/{CURRENCY}" (Price of USD in CURRENCY)
+    elif base == "USD":
+        ticker = f"{quote}=X"
+        
+    # 3. Cross Rates (e.g. EUR in JPY -> EURJPY=X)
+    else:
+        ticker = f"{base}{quote}=X"
+    
+    if verify:
+        # Avoid circular import if fetch_metadata moved, but here they are in same file
+        if not fetch_metadata(ticker, provider="yahoo"):
+            return None
+
+    return SearchResult(
+        provider="yahoo",
+        ticker=ticker,
+        name=base,
+        currency=quote
+    )
+
+
+def fetch_price(ticker: str, provider: str = "yahoo") -> float | None:
+    """
+    Fetches the current real-time/delayed price for a ticker.
+    """
+    source = get_source(provider)
+    if not source:
+        return None
+        
+    try:
+        # Check if source has get_price method (it should if it follows implicit interface)
+        if hasattr(source, "get_price"):
+            return source.get_price(ticker)
+        return None
+    except Exception as e:
+        logger.error(f"Error fetching price for {ticker} from {provider}: {e}")
+        return None
