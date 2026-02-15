@@ -61,6 +61,43 @@ class Commodity(BaseModel):
     )
     isin: str | None = None
     figi: str | None = Field(None, description="Composite FIGI identifier")
+
+    @field_validator("isin")
+    @classmethod
+    def validate_isin(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = v.upper()
+        if not v.isalnum() or len(v) != 12:
+            raise ValueError("ISIN must be 12 alphanumeric characters")
+        
+        # Check country code
+        if not v[:2].isalpha():
+             raise ValueError("ISIN must start with 2-letter country code")
+
+        # Luhn Algorithm Check
+        digits = []
+        for char in v:
+            if char.isdigit():
+                digits.append(int(char))
+            else:
+                # Convert letter to 2 digits: A=10, B=11, ...
+                val = ord(char) - 55
+                digits.append(val // 10)
+                digits.append(val % 10)
+        
+        checksum = 0
+        for i, digit in enumerate(reversed(digits)):
+            if i % 2 == 1:
+                digit *= 2
+                if digit > 9:
+                    digit -= 9
+            checksum += digit
+            
+        if checksum % 10 != 0:
+            raise ValueError(f"Invalid ISIN checksum for {v}")
+            
+        return v
     instrument_type: InstrumentType
     asset_class: AssetClass
     currency: str

@@ -48,10 +48,10 @@ class CommodityRegistry:
             self._load_file(file_path)
 
     def load_path(self, path: Path):
-        """Loads commodity data from a specific file or directory."""
+        """Loads commodity data from a specific file or directory (recursively)."""
         if path.is_dir():
-            for p in sorted(path.iterdir()):
-                if p.suffix in (".yaml", ".yml"):
+            for p in sorted(path.rglob("*")):
+                if p.is_file() and p.suffix in (".yaml", ".yml"):
                     self._load_file(p)
         else:
             self._load_file(path)

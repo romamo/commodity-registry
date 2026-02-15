@@ -1,6 +1,6 @@
 [project]
 name = "commodity-registry"
-version = "0.1.4"
+version = "0.1.5"
 description = "Single source of truth for financial instrument data"
 authors = [
     { name = "Roman Medvedev", email = "pypi@romavm.dev" }
@@ -11,6 +11,7 @@ dependencies = [
     "pydantic>=2.0",
     "pyyaml>=6.0",
     "pydantic-market-data>=0.1.9",
+    "diskcache>=5.6.3",
 ]
 readme = "README.md"
 
@@ -31,6 +32,7 @@ commodity-reg = "commodity_registry.cli:main"
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",
+    "pytest-cov>=7.0.0",
     "ruff>=0.9.2",
 ]
 

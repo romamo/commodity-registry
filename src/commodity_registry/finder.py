@@ -14,8 +14,12 @@ except ImportError:
     FTDataSource = None
 
 from pydantic_market_data.models import SecurityCriteria
+import diskcache
 
 logger = logging.getLogger(__name__)
+
+# Initialize cache (expires in 1 day by default)
+cache = diskcache.Cache(".cache")
 
 
 def get_source(provider: str):
@@ -26,6 +30,17 @@ def get_source(provider: str):
     return None
 
 
+def get_available_providers() -> list[str]:
+    """Returns a list of available data providers (e.g. ['yahoo', 'ft'])."""
+    providers = []
+    if YFinanceDataSource:
+        providers.append("yahoo")
+    if FTDataSource:
+        providers.append("ft")
+    return providers
+
+
+@cache.memoize(expire=86400) # 24 hours
 def fetch_metadata(ticker: str, isin: str | None = None, provider: str = "yahoo") -> dict[str, Any]:
     """
     Fetches common metadata for a security.
@@ -53,17 +68,14 @@ def fetch_metadata(ticker: str, isin: str | None = None, provider: str = "yahoo"
         return {}
 
 
+@cache.memoize(expire=86400)
 def search_isin(criteria: SecurityCriteria) -> list["SearchResult"]:
     """
     Searches for securities across all providers using SecurityCriteria.
     Returns typed search results from each provider.
     """
     results = []
-    providers = []
-    if YFinanceDataSource:
-        providers.append("yahoo")
-    if FTDataSource:
-        providers.append("ft")
+    providers = get_available_providers()
 
     for p in providers:
         source = get_source(p)

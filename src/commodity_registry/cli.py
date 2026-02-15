@@ -25,12 +25,14 @@ def resolve_cmd(args):
 
     # Backup: Try Ticker if no candidates found by ISIN/Name/FIGI
     if not candidates:
+        from .finder import get_available_providers
+
         if args.provider:
             c = reg.find_by_ticker(args.provider, args.token)
             if c:
                 candidates.append(c)
         else:
-            for provider in ["yahoo", "ibkr", "google"]:
+            for provider in get_available_providers():
                 c = reg.find_by_ticker(provider, args.token)
                 if c:
                     candidates.append(c)
@@ -357,7 +359,9 @@ def fetch_cmd(args):
             print(f"  Name:     {res.name}")
             print(f"  Currency: {res.currency}")
     elif args.ticker:
-        for p in ["yahoo", "ft"]:
+        from .finder import get_available_providers
+
+        for p in get_available_providers():
             print(f"\nChecking [{p.upper()}] for {args.ticker}...")
             data = fetch_metadata(args.ticker, provider=p)
             if data:

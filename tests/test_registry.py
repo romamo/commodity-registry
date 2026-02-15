@@ -86,3 +86,30 @@ def test_registry_merging(temp_registry_dir):
     # Ensure tickers are NOT lost if not in override (wait, need to check merge behavior)
     # The current implementation might replace the whole object if ISIN matches.
     # Let's verify merge logic in registry.py
+    # NOTE: The current simple implementation overrides the entire object if ISIN matches.
+
+def test_recursive_loading(temp_registry_dir):
+    # Create a nested directory
+    nested_dir = temp_registry_dir / "subdir" / "nested"
+    nested_dir.mkdir(parents=True)
+    
+    # Add a file in the nested directory
+    nested_file = nested_dir / "nested.yaml"
+    nested_data = {
+        "commodities": [
+            {
+                "name": "NESTED",
+                "isin": "US0378331005", # Valid ISIN (reused AAPL for validity)
+                "asset_class": "Stock",
+                "instrument_type": "Stock",
+                "currency": "USD"
+            }
+        ]
+    }
+    with open(nested_file, "w") as f:
+        yaml.dump(nested_data, f)
+        
+    reg = CommodityRegistry(extra_paths=[temp_registry_dir], include_bundled=False)
+    c = reg.find_candidates("NESTED")
+    assert len(c) == 1
+    assert c[0].name == "NESTED"

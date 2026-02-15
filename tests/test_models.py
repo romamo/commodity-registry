@@ -25,19 +25,33 @@ def test_commodity_minimal():
 
 def test_commodity_full():
     c = Commodity(
-        name="TEST_ETF",
-        asset_class=AssetClass.EQUITY_ETF,
-        instrument_type=InstrumentType.ETF,
+        name="TEST",
+        isin="US0378331005", # Valid AAPL ISIN
+        instrument_type=InstrumentType.STOCK,
+        asset_class=AssetClass.STOCK,
         currency="USD",
-        isin="US1234567890",
-        issuer="Test Issuer",
-        underlying="Test Index",
-        tickers=Tickers(yahoo="TEST"),
-        validation_points=[ValidationPoint(date="2024-01-01", price=50.0)]
+        tickers={"yahoo": "TEST"},
+        validation_points=[{"date": "2024-01-01", "price": 100.0}]
     )
-    assert c.isin == "US1234567890"
+    assert c.isin == "US0378331005"
     assert c.tickers.yahoo == "TEST"
     assert len(c.validation_points) == 1
+
+def test_isin_validation():
+    # Valid ISIN (Apple)
+    Commodity(name="AAPL", isin="US0378331005", instrument_type=InstrumentType.STOCK, asset_class=AssetClass.STOCK, currency="USD")
+    
+    # Invalid Length
+    with pytest.raises(ValidationError, match="12 alphanumeric"):
+        Commodity(name="BAD", isin="US123", instrument_type=InstrumentType.STOCK, asset_class=AssetClass.STOCK, currency="USD")
+        
+    # Invalid Country Code
+    with pytest.raises(ValidationError, match="2-letter country code"):
+        Commodity(name="BAD", isin="120378331005", instrument_type=InstrumentType.STOCK, asset_class=AssetClass.STOCK, currency="USD")
+        
+    # Invalid Checksum (last digit changed from 5 to 6)
+    with pytest.raises(ValidationError, match="Invalid ISIN checksum"):
+        Commodity(name="BAD", isin="US0378331006", instrument_type=InstrumentType.STOCK, asset_class=AssetClass.STOCK, currency="USD")
 
 def test_commodity_invalid_currency():
     with pytest.raises(ValidationError):
