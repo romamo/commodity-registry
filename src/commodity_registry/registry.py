@@ -104,11 +104,14 @@ class CommodityRegistry:
         matches = self.find_candidates(SecurityCriteria(isin=isin, currency=currency))
         return matches[0] if matches else None
 
-    def find_candidates(self, criteria: SecurityCriteria) -> list[Commodity]:
+    def find_candidates(self, criteria: SecurityCriteria | str) -> list[Commodity]:
         """
         Finds all commodities matching the criteria using strict field lookups.
         Returns empty list if no match.
         """
+        if isinstance(criteria, str):
+            criteria = SecurityCriteria(symbol=criteria)
+
         candidates = []
 
         # 1. Try ISIN (Strict)

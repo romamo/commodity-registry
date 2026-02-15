@@ -51,8 +51,9 @@ def test_find_by_isin(temp_registry_dir):
     assert c.name == "AAPL"
 
 def test_find_candidates_by_name(temp_registry_dir):
+    from pydantic_market_data.models import SecurityCriteria
     reg = CommodityRegistry(extra_paths=[temp_registry_dir], include_bundled=False)
-    candidates = reg.find_candidates("AAPL")
+    candidates = reg.find_candidates(SecurityCriteria(symbol="AAPL"))
     assert len(candidates) == 1
     assert candidates[0].name == "AAPL"
 
@@ -110,6 +111,7 @@ def test_recursive_loading(temp_registry_dir):
         yaml.dump(nested_data, f)
         
     reg = CommodityRegistry(extra_paths=[temp_registry_dir], include_bundled=False)
-    c = reg.find_candidates("NESTED")
+    from pydantic_market_data.models import SecurityCriteria
+    c = reg.find_candidates(SecurityCriteria(symbol="NESTED"))
     assert len(c) == 1
     assert c[0].name == "NESTED"

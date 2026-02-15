@@ -22,6 +22,8 @@ jobs:
         uses: astral-sh/setup-uv@v7
       - name: Install Python 3.12
         run: uv python install 3.12
+      - name: Run tests
+        run: uv run pytest
       - name: Build
         run: uv build
       # Check that basic features work and we didn't miss to include crucial files
