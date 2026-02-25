@@ -14,6 +14,8 @@ dependencies = [
     "diskcache>=5.6.3",
     "platformdirs>=4.9.2",
     "pydantic-settings>=2.7.1",
+    "py-ftmarkets>=0.1.5",
+    "py-yfinance>=0.1.7",
 ]
 readme = "README.md"
 
@@ -58,7 +60,3 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
-[tool.uv.sources]
-py-yfinance = { path = "../py-yfinance", editable = true }
-py-ftmarkets = { path = "../py-ftmarkets", editable = true }
-pydantic-market-data = { path = "../pydantic-market-data", editable = true }
