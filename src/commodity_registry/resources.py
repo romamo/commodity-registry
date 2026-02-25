@@ -8,7 +8,9 @@ COMMODITIES_DIR = "commodities"
 
 def get_schema_path() -> Path:
     """Returns the path to the bundled JSON schema."""
-    return importlib.resources.files(PACKAGE_DATA_PATH).joinpath("commodities.schema.json")
+    return Path(
+        str(importlib.resources.files(PACKAGE_DATA_PATH).joinpath("commodities.schema.json"))
+    )
 
 
 def get_commodity_files() -> Iterator[Path]:
@@ -19,4 +21,4 @@ def get_commodity_files() -> Iterator[Path]:
 
     for entry in data_dir.iterdir():
         if entry.name.endswith(".yaml") or entry.name.endswith(".yml"):
-            yield entry
+            yield Path(str(entry))

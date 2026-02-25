@@ -19,13 +19,13 @@ uv tool install commodity-registry
 ## Configuration
 
 The registry loads data from two sources:
-1.  **Bundled Data**: Built-in common commodities (ETFs, Stocks).
-2.  **User Data**: Custom YAML files located at `PATH_COMMODITY_REGISTRY`.
+1.  **Bundled Data**: Built-in commodities (ETFs, Stocks).
+2.  **User Data**: Custom YAML files located at `COMMODITY_REGISTRY_PATH`.
 
 Set the environment variable to point to your custom registry:
 
 ```bash
-export PATH_COMMODITY_REGISTRY=~/path/to/my/registry
+export COMMODITY_REGISTRY_PATH=~/path/to/my/registry
 ```
 
 The registry recursively scans this directory for `.yaml` and `.yml` files.

@@ -1,18 +1,62 @@
 commodities:
-- name: CSPX
-  isin: IE00B5BMR087
-  instrument_type: ETF
-  asset_class: EquityETF
-  currency: USD
-  tickers:
-    yahoo: CSPX.L
-- name: SXR8
-  isin: IE00B5BMR087
+- name: GRDYNAMIK
+  isin: DE000A0H0W99
   instrument_type: ETF
   asset_class: EquityETF
   currency: EUR
   tickers:
-    yahoo: SXR8.DE
+    yahoo: 0P00006OXP.F
+- name: COPPER
+  isin: GB00B15KXQ89
+  instrument_type: ETC
+  asset_class: CommodityETF
+  currency: USD
+  tickers:
+    yahoo: COPA.L
+- name: GDX
+  isin: IE00BQQP9F84
+  instrument_type: ETF
+  asset_class: EquityETF
+  currency: EUR
+  tickers:
+    yahoo: G2X.DE
+- name: GDGB
+  isin: IE00BQQP9F84
+  instrument_type: ETF
+  asset_class: EquityETF
+  currency: GBP
+  tickers:
+    yahoo: GDGB.L
+- name: GDX_USD
+  isin: IE00BQQP9F84
+  instrument_type: ETF
+  asset_class: EquityETF
+  currency: USD
+  tickers:
+    yahoo: GDX.L
+  validation_points:
+  - date: '2026-02-18'
+    price: 115.4
+- name: AVGO
+  isin: US11135F1012
+  instrument_type: Stock
+  asset_class: Stock
+  currency: USD
+  tickers:
+    yahoo: AVGO
+- name: MSFT
+  isin: US5949181045
+  instrument_type: Stock
+  asset_class: Stock
+  currency: USD
+  tickers:
+    yahoo: MSFT
+- name: JPY.X
+  instrument_type: Stock
+  asset_class: Stock
+  currency: JPY
+  tickers:
+    yahoo: JPY=X
 - name: AAPL
   isin: US0378331005
   instrument_type: Stock
@@ -20,10 +64,13 @@ commodities:
   currency: USD
   tickers:
     yahoo: AAPL
-- name: X.4GLD
-  isin: DE000A0S9GB0
-  instrument_type: ETF
-  asset_class: EquityETF
+- name: ASML
+  isin: NL0010273215
+  instrument_type: Stock
+  asset_class: Stock
   currency: EUR
   tickers:
-    ft: 4GLD:GER:EUR
+    yahoo: ASML.AS
+  validation_points:
+  - date: '2026-01-01'
+    price: 920.17

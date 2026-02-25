@@ -1,296 +1,513 @@
-import argparse
-import os
+from __future__ import annotations
+
+import logging
 import sys
 from pathlib import Path
+from typing import Annotated, Any, Literal
+
+import pandas as pd  # type: ignore[import-untyped]
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    Field,
+)
+from pydantic_market_data.cli_models import (
+    CURR,
+    DATE,
+    NAME,
+    PATHS,
+    PRICE,
+    SYMBOL,
+    GlobalArgs,
+    PatchedCliSettingsSource,
+)
+from pydantic_market_data.cli_models import (
+    ISIN as ISIN_HELP,
+)
+from pydantic_market_data.models import (
+    ISIN,
+    Currency,
+    CurrencyCode,
+    Price,
+    PriceVerificationError,
+    SecurityCriteria,
+)
+from pydantic_settings import (
+    BaseSettings,
+    CliApp,
+    CliPositionalArg,
+    CliSubCommand,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
 
 from .models import AssetClass, InstrumentType
 from .registry import get_registry
 
-
-def get_registry_for_args(args):
-    """Factory to create a registry based on CLI arguments."""
-    extra_paths = []
-    for p in args.registry_path:
-        path = Path(p).expanduser()
-        if path.exists():
-            extra_paths.append(path)
-
-    return get_registry(include_bundled=not args.no_bundled, extra_paths=extra_paths)
+logger = logging.getLogger(__name__)
 
 
-def resolve_cmd(args):
-    """Resolves a token (ISIN, Name, Ticker) to a canonical commodity."""
-    from pydantic_market_data.models import SecurityCriteria
-    from .finder import resolve_security, verify_ticker
-
-    reg = get_registry_for_args(args)
-    
-    # Build Criteria
-    token_upper = args.token.upper()
-    isin = args.token if (len(args.token) >= 12 and token_upper.startswith(("US", "GB", "DE", "FR", "NL"))) else None
-    symbol = args.token if not isin else None
-    criteria = SecurityCriteria(isin=isin, symbol=symbol, currency=args.currency)
-
-    # Use Unified Routine
-    res = resolve_security(criteria, verify=True, registry=reg)
-    
-    if not res:
-        print(f"Could not resolve '{args.token}'")
-        sys.exit(1)
-
-    # Verification (if requested)
-    if args.date and args.price:
-        if verify_ticker(res.ticker, args.date, args.price, provider=res.provider):
-            print(f"  [OK] Verified {res.name} via {res.provider.upper()} ({res.ticker})")
-        else:
-            print(f"  [!] FAILED: Price {args.price} on {args.date} does not match {res.ticker}")
-            sys.exit(1)
-
-    print(f"Resolved: {res.name} -> {res.ticker} ({res.provider})")
-
-
-def lint_cmd(args):
-    """Validates data against the schema and rules."""
-    from .finder import fetch_metadata
-
-    if args.path:
-        # Validate specific path
-        path = Path(args.path).expanduser()
-        print(f"Linting external path: {path}")
-        reg = get_registry(include_bundled=False, extra_paths=[path])
+def setup_logging(v: bool, vv: bool):
+    """Set up logging based on v (INFO) and vv (DEBUG) flags."""
+    if vv:
+        level = logging.DEBUG
+        verbosity = 2
+        fmt = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    elif v:
+        level = logging.INFO
+        verbosity = 1
+        fmt = "[%(levelname)s] %(name)s: %(message)s"
     else:
-        # Validate configured registry
-        reg = get_registry_for_args(args)
-        print(f"Linting registry ({len(reg.get_all())} commodities)...")
+        level = logging.WARNING
+        verbosity = 0
+        fmt = "%(message)s"
 
-    # Validation already happened during loading via Pydantic.
-    # We add logical checks here.
-    errors = reg.load_errors.copy()
-    warnings = []
-
-    # Check 1: Unique ISINs
-    seen_isins = {}
-    for c in reg.get_all():
-        if c.isin:
-            if c.isin in seen_isins:
-                errors.append(f"Duplicate ISIN {c.isin} in {c.name} and {seen_isins[c.isin]}")
-            seen_isins[c.isin] = c.name
-
-    # Check 2: Live Verification (if requested)
-    if args.verify:
-        from .finder import verify_ticker
-
-        targets = reg.get_all()
-        if args.only:
-            targets = [c for c in targets if c.name == args.only]
-            if not targets:
-                print(f"Error: Commodity '{args.only}' not found.")
-                sys.exit(1)
-
-        print(f"\n=== Granular Data Audit (Live) - {len(targets)} items ===")
-        for c in targets:
-            ticker = None
-            provider = "yahoo"
-
-            if c.tickers:
-                if c.tickers.yahoo:
-                    ticker = c.tickers.yahoo
-                    provider = "yahoo"
-                elif c.tickers.ft:
-                    ticker = c.tickers.ft
-                    provider = "ft"
-                elif c.tickers.google:
-                    ticker = c.tickers.google
-                    provider = "google"
-
-            if ticker:
-                audit_log = []
-                success = True
-
-                # Fetch metadata
-                ext_data = fetch_metadata(ticker, provider=provider)
-
-                if not ext_data:
-                    audit_log.append(f"  [!] FAILED: No external data found for {ticker}")
-                    warnings.append(f"{c.name}: No external metadata found")
-                    success = False
-                else:
-                    audit_log.append(f"  ISIN:     {c.isin or 'N/A'}")
-
-                    # Currency Check
-                    ext_curr = ext_data.get("currency")
-                    status_curr = (
-                        "[OK]"
-                        if ext_curr and ext_curr.upper() == c.currency.upper()
-                        else f"[MISMATCH: {ext_curr}]"
-                    )
-                    audit_log.append(f"  Currency: {c.currency} {status_curr}")
-                    if "MISMATCH" in status_curr:
-                        warnings.append(f"{c.name}: Currency mismatch")
-                        success = False
-
-                    if c.figi:
-                        audit_log.append(f"  FIGI:     {c.figi}")
-
-                    # Historical Price Verification Points
-                    if c.validation_points:
-                        audit_log.append("  Historical Verification:")
-                        for vp in c.validation_points:
-                            verified_count = 0
-                            vp_log = [f"    - {vp.date} (Target: {vp.price}):"]
-
-                            providers_to_check = []
-                            if c.tickers:
-                                if c.tickers.yahoo:
-                                    providers_to_check.append(("yahoo", c.tickers.yahoo))
-                                if c.tickers.ft:
-                                    providers_to_check.append(("ft", c.tickers.ft))
-                                if c.tickers.google:
-                                    providers_to_check.append(("google", c.tickers.google))
-
-                            if not providers_to_check:
-                                vp_log.append("      [SKIPPED: No ticker found]")
-                                audit_log.extend(vp_log)
-                                continue
-
-                            for p, t_val in providers_to_check:
-                                if verify_ticker(t_val, vp.date, vp.price, provider=p):
-                                    vp_log.append(f"      * {p.upper()}: [OK: Range Match]")
-                                    verified_count += 1
-                                else:
-                                    vp_log.append(f"      * {p.upper()}: [FAILED]")
-
-                            if verified_count == 0:
-                                success = False
-                                audit_log.extend(vp_log)
-                                warnings.append(f"{c.name}: Price verification failed on {vp.date}")
-                            else:
-                                audit_log.extend(vp_log)
-
-                    else:
-                        audit_log.append(
-                            "  Historical Verification: [SKIPPED: No validation points]"
-                        )
-
-                # Print summary one-liner
-                status_label = "OK" if success else "FAILED"
-                print(f"{c.name}({provider} {ticker}): {status_label}")
-                if not success:
-                    for line in audit_log:
-                        print(line)
-
-            else:
-                # Fallback if no online check possible
-                if not c.tickers or not (c.tickers.yahoo or c.tickers.ft or c.tickers.google):
-                    print(f"{c.name}: [SKIPPED: No compatible ticker]")
-                    continue
-
-    if errors:
-        for e in errors:
-            print(f"ERROR: {e}")
-        sys.exit(1)
-
-    if warnings:
-        for w in warnings:
-            print(f"WARNING: {w}")
-
-    print("All checks passed.")
-
-
-def add_cmd(args):
-    """Adds a new commodity to the registry via CLI arguments (non-interactive)."""
-    from pydantic_market_data.models import SecurityCriteria
-
-    from .finder import search_isin
-    from .registry import add_commodity
-
-    # 1. Resolve Target Path
-    target_path = Path(args.registry_path[0]).expanduser()
-    if target_path.is_dir():
-        target_path = target_path / "manual.yaml"
-
-    # Use positional token if provided and explicit flags are missing
-    isin = args.isin
-    ticker = args.ticker
-    if args.token:
-        token_upper = args.token.upper()
-        if len(args.token) >= 12 and token_upper.startswith(("US", "GB", "DE", "FR", "NL")): # Simple ISIN heuristic
-            if not isin: isin = args.token
-        else:
-            if not ticker: ticker = args.token
-
-    name = args.name
-    currency = args.currency
-    inst_type_str = args.instrument_type
-    asset_class_str = args.asset_class
-
-    # 2. Build SecurityCriteria
-    criteria = SecurityCriteria(
-        isin=isin,
-        symbol=ticker,
-        currency=currency,
-        target_price=float(args.validation_price) if args.validation_price else None,
-        target_date=args.validation_date,
+    # Configure root logger
+    logging.basicConfig(
+        level=level, format=fmt, datefmt="%Y-%m-%d %H:%M:%S", stream=sys.stderr, force=True
     )
 
-    metadata = None
+    # If verbosity is low (WARNING/INFO), silence noisy libraries.
+    if verbosity < 2:
+        logging.getLogger("urllib3").setLevel(logging.WARNING)
+        logging.getLogger("requests").setLevel(logging.WARNING)
+        logging.getLogger("py_ibkr").setLevel(logging.WARNING)
 
-    # 3. Fetch Metadata if requested
-    if args.fetch:
-        print("Searching for metadata...")
-        # Search using criteria
-        results = search_isin(criteria)
 
-        if results:
-            metadata = results[0]
-            print(f"Found candidate: {metadata.ticker} ({metadata.provider}) - {metadata.name}")
+class CommonArgs(GlobalArgs, BaseModel):
+    model_config = SettingsConfigDict(
+        populate_by_name=True,
+        cli_kebab_case=True,
+        cli_implicit_flags="toggle",
+        cli_hide_none_type=True,
+        extra="forbid",
+    )
+    registry_path: list[PATHS] = Field(
+        default=[PATHS("data/commodities/")],
+        description="Comma-separated paths to your user registry files or directories",
+    )
+    bundled: bool = Field(True, description="Exclude the bundled database")
 
-            # Auto-fill missing
-            if not criteria.symbol:
-                criteria.symbol = metadata.ticker
-            if not name:
-                name = metadata.name
-            if not currency:
-                currency = metadata.currency
-                criteria.currency = currency  # Update criteria
-        else:
-            print("No online metadata found.")
-            if not ticker and not isin:
-                print("Error: No ticker or ISIN provided and no online match found.")
+    def get_registry(self):
+        extra_paths = []
+        for p_str in self.registry_path:
+            p_obj = Path(p_str).expanduser()
+            if p_obj.exists():
+                extra_paths.append(p_obj)
+        return get_registry(include_bundled=self.bundled, extra_paths=extra_paths)
+
+
+def _validate_token_not_subcommand(v: str | None) -> str | None:
+    if v in {"resolve", "lint", "add", "fetch"}:
+        raise ValueError(f"'{v}' is a subcommand name, not a token")
+    return v
+
+
+Token = Annotated[str, AfterValidator(_validate_token_not_subcommand)]
+OptionalToken = Annotated[str | None, AfterValidator(_validate_token_not_subcommand)]
+
+
+def _is_isin(token: str) -> bool:
+    """Returns True if token looks like an ISIN (12 alphanumeric chars, 2-letter country prefix)."""
+    upper = token.upper()
+    return len(token) == 12 and upper[:2].isalpha() and upper.isalnum()
+
+
+class resolve(CommonArgs):
+    command: Literal["resolve"] = "resolve"
+    token: CliPositionalArg[Token]
+    provider: NAME | None = Field(None, description="Filter candidates by provider name")
+    currency: CURR | None = Field(None, description="Filter candidates by currency code")
+    date: DATE | None = Field(None, description="Validation date for price matching")
+    price: PRICE | None = Field(None, description="Validation price for matching")
+    dry_run: bool = Field(False, description="Parse and resolve without persisting changes")
+    report_price: bool = Field(False, description="Fetch and include current price in output")
+
+    def cli_cmd(self) -> None:
+        from .finder import get_available_providers, resolve_and_persist, verify_ticker
+
+        logger.info(f"Resolving token: {self.token}")
+        reg = self.get_registry()
+
+        # Build Criteria
+        isin = self.token if _is_isin(self.token) else None
+        symbol = self.token if not isin else None
+        criteria = SecurityCriteria(
+            isin=isin,
+            symbol=symbol,
+            currency=CurrencyCode(Currency(self.currency.upper())) if self.currency else None,
+            target_price=Price(self.price) if self.price else None,
+            target_date=pd.to_datetime(self.date).date() if self.date else None,
+        )
+
+        # By default, use the first registry path as the target for new discoveries
+        target_path = Path(self.registry_path[0]).expanduser() if self.registry_path else None
+
+        res = resolve_and_persist(
+            criteria,
+            registry=reg,
+            store=True,
+            target_path=target_path,
+            dry_run=self.dry_run,
+            include_price=self.report_price,
+        )
+
+        if not res:
+            providers = get_available_providers()
+
+            if not providers:
+                logger.error(
+                    f"Could not resolve '{self.token}'. "
+                    "Install providers: uv tool install 'commodity-registry[providers]'"
+                )
                 sys.exit(1)
 
-    # 4. Validation & Enum Conversion
-    missing = []
-    if not isin and not ticker:
-        missing.append("--isin or --ticker")
-    # For instrument type/asset class, we require them currently as CLI args
-    if not inst_type_str:
-        missing.append("--instrument-type")
-    if not asset_class_str:
-        missing.append("--asset-class")
+            logger.error(f"Could not resolve '{self.token}'")
+            sys.exit(1)
 
-    # If we still don't have currency (didn't fetch it, didn't provide it)
-    if not currency:
-        missing.append("--currency")
+        # Verification (if requested)
+        if self.date and self.price:
+            logger.info(f"Verifying price {self.price} on {self.date}...")
+            v_date = pd.to_datetime(self.date).date()
+            try:
+                if verify_ticker(res.ticker, v_date, self.price, provider=res.provider):
+                    print(f"  [OK] Verified {res.name} via {res.provider.upper()} ({res.ticker})")
+                else:
+                    logger.error(
+                        f"  [!] FAILED: Price {self.price} on {self.date} "
+                        f"does not match {res.ticker}"
+                    )
+                    sys.exit(1)
+            except PriceVerificationError as e:
+                logger.error(f"  [!] FAILED: {e}")
+                sys.exit(1)
 
-    if missing:
-        print(f"Error: Missing required fields: {', '.join(missing)}")
-        print("Note: Use --fetch with --isin or --ticker to auto-populate some fields.")
-        sys.exit(1)
+        if self.format == "json":
+            print(res.model_dump_json(indent=2))
+        else:
+            p_val = getattr(res.price, "value", res.price) if res.price else 0.0
+            p_label = f"Price {res.price_date}" if res.price_date else "Last Price"
+            price_str = f" [{p_label}: {p_val:.2f} {res.currency}]" if res.price else ""
+            print(f"Resolved: {res.name} -> {str(res.ticker)} ({res.provider.value}){price_str}")
 
-    try:
-        # Convert string args to Enums
-        inst_type = InstrumentType(inst_type_str)
-        asset_class = AssetClass(asset_class_str)
-    except ValueError as e:
-        print(f"Error: Invalid enum value: {e}")
-        print(f"Valid InstrumentTypes: {[e.value for e in InstrumentType]}")
-        print(f"Valid AssetClasses: {[e.value for e in AssetClass]}")
-        sys.exit(1)
 
-    # 5. Add to Registry
-    try:
-        # If user provided a ticker manually, ensure it's in criteria
+class lint(CommonArgs):
+    command: Literal["lint"] = "lint"
+    path: str | None = Field(None, description="Specific file or directory to lint")
+    verify: bool = Field(False, description="Perform live verification against online sources")
+    only: str | None = Field(None, description="Verify only a specific commodity name")
+
+    def cli_cmd(self) -> None:
+        from .finder import fetch_metadata, verify_ticker
+        from .interfaces import ProviderName
+
+        if self.path:
+            # Validate specific path
+            path_obj = Path(self.path).expanduser()
+            logger.info(f"Linting external path: {path_obj}")
+            reg = get_registry(include_bundled=False, extra_paths=[path_obj])
+        else:
+            # Validate configured registry
+            reg = self.get_registry()
+            logger.info(f"Linting registry ({len(reg.get_all())} commodities)...")
+
+        # Validation already happened during loading via Pydantic.
+        errors = reg.load_errors.copy()
+        warnings = []
+
+        # Check 1: Unique ISIN + Currency pairs
+        seen_isinc: dict[tuple[str, str], str] = {}  # (isin, currency) -> name
+        for c in reg.get_all():
+            if c.isin:
+                key = (str(c.isin).upper(), str(c.currency).upper())
+                if key in seen_isinc:
+                    errors.append(
+                        f"Duplicate ISIN {c.isin} with currency {c.currency} in {c.name} "
+                        f"and {seen_isinc[key]}"
+                    )
+                seen_isinc[key] = c.name
+
+        # Check 2: Live Verification
+        if self.verify:
+            targets = reg.get_all()
+            if self.only:
+                targets = [c for c in targets if c.name == self.only]
+                if not targets:
+                    logger.error(f"Commodity '{self.only}' not found.")
+                    sys.exit(1)
+
+            print(f"\n=== Granular Data Audit (Live) - {len(targets)} items ===")
+            for c in targets:
+                ticker = None
+                provider = ProviderName.YAHOO
+
+                if c.tickers:
+                    if c.tickers.yahoo:
+                        ticker = c.tickers.yahoo
+                        provider = ProviderName.YAHOO
+                    elif c.tickers.ft:
+                        ticker = c.tickers.ft
+                        provider = ProviderName.FT
+                    elif c.tickers.google:
+                        ticker = c.tickers.google
+                        provider = ProviderName.GOOGLE
+
+                if ticker:
+                    audit_log = []
+                    success = True
+
+                    # Fetch metadata
+                    logger.debug(f"Fetching live metadata for {ticker} via {provider}...")
+                    ext_data = fetch_metadata(ticker, provider=provider)
+
+                    if not ext_data:
+                        audit_log.append(f"  [!] FAILED: No external data found for {ticker}")
+                        warnings.append(f"{c.name}: No external metadata found")
+                        success = False
+                    else:
+                        # ISIN Check
+                        # SearchResult doesn't currently store ISIN directly
+                        # but if it does later
+                        ext_isin = ext_data.isin if hasattr(ext_data, "isin") else None
+                        if c.isin and ext_isin:
+                            if str(c.isin).upper() != ext_isin.upper():
+                                audit_log.append(f"  ISIN:     {c.isin} [MISMATCH: {ext_isin}]")
+                                warnings.append(
+                                    f"{c.name}: ISIN mismatch (Registry: {c.isin}, "
+                                    f"Provider: {ext_isin})"
+                                )
+                                success = False
+                            else:
+                                audit_log.append(f"  ISIN:     {c.isin} [OK]")
+                        else:
+                            audit_log.append(
+                                f"  ISIN:     {c.isin or 'N/A'} (Provider: {ext_isin or 'N/A'})"
+                            )
+
+                        # Ticker Check
+                        ext_ticker = ext_data.ticker
+                        if ticker and ext_ticker:
+                            if ticker.upper() != str(ext_ticker).upper():
+                                audit_log.append(f"  Ticker:   {ticker} [MISMATCH: {ext_ticker}]")
+                                warnings.append(
+                                    f"{c.name}: Ticker mismatch (Registry: {ticker}, "
+                                    f"Provider: {ext_ticker})"
+                                )
+                                success = False
+                            else:
+                                audit_log.append(f"  Ticker:   {ticker} [OK]")
+                        else:
+                            audit_log.append(
+                                f"  Ticker:   {ticker or 'N/A'} (Provider: {ext_ticker or 'N/A'})"
+                            )
+
+                        # Currency Check
+                        ext_curr = (
+                            str(ext_data.currency.root)
+                            if (ext_data.currency and hasattr(ext_data.currency, "root"))
+                            else str(ext_data.currency)
+                            if ext_data.currency
+                            else None
+                        )
+                        status_curr = (
+                            "[OK]"
+                            if (
+                                ext_curr
+                                and c.currency
+                                and ext_curr.upper() == str(c.currency).upper()
+                            )
+                            else f"[MISMATCH: {ext_curr}]"
+                        )
+                        audit_log.append(f"  Currency: {c.currency} {status_curr}")
+                        if "MISMATCH" in status_curr:
+                            warnings.append(f"{c.name}: Currency mismatch")
+                            success = False
+
+                        if c.figi:
+                            audit_log.append(f"  FIGI:     {c.figi}")
+
+                        # Historical Price Verification Points
+                        if c.validation_points:
+                            audit_log.append("  Historical Verification:")
+                            for vp in c.validation_points:
+                                verified_count = 0
+                                vp_log = [f"    - {vp.date} (Target: {vp.price}):"]
+
+                                providers_to_check = []
+                                if c.tickers:
+                                    if c.tickers.yahoo:
+                                        providers_to_check.append(
+                                            (ProviderName.YAHOO, c.tickers.yahoo)
+                                        )
+                                    if c.tickers.ft:
+                                        providers_to_check.append((ProviderName.FT, c.tickers.ft))
+                                    if c.tickers.google:
+                                        providers_to_check.append(
+                                            (ProviderName.GOOGLE, c.tickers.google)
+                                        )
+
+                                if not providers_to_check:
+                                    vp_log.append("      [SKIPPED: No ticker found]")
+                                    audit_log.extend(vp_log)
+                                    continue
+
+                                for p_name, t_val in providers_to_check:
+                                    v_price = (
+                                        Price(vp.price)
+                                        if isinstance(vp.price, (float, int))
+                                        else vp.price
+                                    )
+                                    try:
+                                        if verify_ticker(t_val, vp.date, v_price, provider=p_name):
+                                            vp_log.append(
+                                                f"      * {p_name.upper()}: [OK: Range Match]"
+                                            )
+                                            verified_count += 1
+                                        else:
+                                            vp_log.append(f"      * {p_name.upper()}: [FAILED]")
+                                    except PriceVerificationError as e:
+                                        vp_log.append(f"      * {p_name.upper()}: [FAILED: {e}]")
+
+                                if verified_count == 0:
+                                    success = False
+                                    audit_log.extend(vp_log)
+                                    warnings.append(
+                                        f"{c.name}: Price verification failed on {vp.date}"
+                                    )
+                                else:
+                                    audit_log.extend(vp_log)
+
+                        else:
+                            audit_log.append(
+                                "  Historical Verification: [SKIPPED: No validation points]"
+                            )
+
+                    # Print summary one-liner
+                    status_lbl = "OK" if success else "FAILED"
+                    print(f"{c.name}({provider.value} {ticker}): {status_lbl}")
+                    if not success or self.vv:
+                        for line in audit_log:
+                            print(line)
+
+                else:
+                    if not c.tickers or not (c.tickers.yahoo or c.tickers.ft or c.tickers.google):
+                        print(f"{c.name}: [SKIPPED: No compatible ticker]")
+                        continue
+
+        if errors:
+            for err in errors:
+                logger.error(f"Validation Error: {err}")
+            sys.exit(1)
+
+        if warnings:
+            for w in warnings:
+                logger.warning(f"Validation Warning: {w}")
+
+        logger.info("All checks passed.")
+
+
+class add(CommonArgs):
+    command: Literal["add"] = "add"
+    token: CliPositionalArg[OptionalToken] = None
+    name: NAME | None = Field(None, description="Canonical name of the commodity")
+    isin: ISIN_HELP | None = Field(None, description="ISIN code")
+    ticker: SYMBOL | None = Field(None, description="Ticker symbol")
+    instrument_type: InstrumentType | None = Field(
+        None, description="Categorization (e.g. ETF, Future)"
+    )
+    asset_class: AssetClass | None = Field(
+        None, description="Asset class (Equity, Commodity, etc.)"
+    )
+    currency: CURR | None = Field(None, description="Primary currency")
+    figi: str | None = Field(None, description="FIGI identifier")
+    validation_date: DATE | None = Field(None, description="Date for initial verification")
+    validation_price: PRICE | None = Field(None, description="Price for initial verification")
+    fetch_meta: bool = Field(
+        False, alias="fetch", description="Fetch missing metadata from online sources"
+    )
+    dry_run: bool = Field(False, description="Preview changes without writing to file")
+
+    def cli_cmd(self) -> None:
+        from .finder import search_isin
+        from .registry import add_commodity
+
+        # Resolve Target Path
+        target_path = Path(self.registry_path[0]).expanduser()
+        if target_path.is_dir():
+            target_path = target_path / "manual.yaml"
+
+        isin: Any = self.isin
+        ticker = self.ticker
+        if self.token:
+            if _is_isin(self.token):
+                if not isin:
+                    isin = ISIN(self.token)
+            else:
+                if not ticker:
+                    ticker = SYMBOL(self.token)
+
+        name = self.name
+        currency = self.currency
+
+        reg = self.get_registry()
+        existing_entry = reg.find_by_isin(isin, currency) if (isin and currency) else None
+
+        if existing_entry and not name:
+            logger.info(
+                f"Using existing name '{existing_entry.name}' for instrument {isin}/{currency}"
+            )
+            name = existing_entry.name
+
+        criteria = SecurityCriteria(
+            isin=isin,
+            symbol=ticker,
+            currency=CurrencyCode(Currency(currency.upper())) if currency else None,
+            target_price=Price(self.validation_price) if self.validation_price else None,
+            target_date=(
+                pd.to_datetime(self.validation_date).date() if self.validation_date else None
+            ),
+        )
+
+        metadata = None
+        if self.fetch_meta:
+            logger.info("Searching for metadata...")
+            results = search_isin(criteria)
+            if results:
+                metadata = results[0]
+                logger.info(
+                    f"Found candidate: {metadata.ticker.root} "
+                    f"({metadata.provider.value}) - {metadata.name}"
+                )
+                if not criteria.symbol:
+                    criteria.symbol = str(metadata.ticker)
+                if not name:
+                    name = metadata.name
+                if not currency:
+                    currency = metadata.currency.root if metadata.currency else None
+                    criteria.currency = metadata.currency
+            else:
+                logger.warning("No online metadata found.")
+                if not ticker and not isin:
+                    logger.error("No ticker or ISIN provided and no online match found.")
+                    sys.exit(1)
+
+        missing = []
+        if not isin and not ticker:
+            missing.append("--isin or --ticker")
+        if not self.instrument_type:
+            missing.append("--instrument-type")
+        if not self.asset_class:
+            missing.append("--asset-class")
+        if not currency:
+            missing.append("--currency")
+
+        if missing:
+            logger.error(f"Missing required fields: {', '.join(missing)}")
+            sys.exit(1)
+
+        inst_type = InstrumentType(self.instrument_type)
+        asset_class_val = AssetClass(self.asset_class)
+
         if not criteria.symbol and ticker:
             criteria.symbol = ticker
 
@@ -299,109 +516,97 @@ def add_cmd(args):
             metadata=metadata,
             target_path=target_path,
             instrument_type=inst_type,
-            asset_class=asset_class,
-            verbose=True,
-            dry_run=args.dry_run,
+            asset_class=asset_class_val,
+            name=name,
+            dry_run=self.dry_run,
         )
         print(f"Successfully processed {commodity.name}")
 
-    except Exception as e:
-        print(f"Error adding commodity: {e}")
-        sys.exit(1)
+
+class fetch(CommonArgs):
+    command: Literal["fetch"] = "fetch"
+    isin: ISIN_HELP | None = Field(None, description="ISIN to fetch")
+    ticker: SYMBOL | None = Field(None, description="Ticker to fetch")
+    price_info: bool = Field(False, alias="price", description="Also fetch the latest price")
+
+    def cli_cmd(self) -> None:
+        from .finder import fetch_price, resolve_security
+
+        logger.info(f"Fetching details for ISIN={self.isin}, Ticker={self.ticker}")
+        criteria = SecurityCriteria(isin=self.isin, symbol=self.ticker)
+        res = resolve_security(criteria, verify=True)
+
+        if not res:
+            logger.warning("No results found.")
+            return
+
+        if self.format == "json":
+            print(res.model_dump_json(indent=2))
+        else:
+            print(f"\nFound Details ({res.provider.value.upper()}):")
+            print(f"  Ticker:   {str(res.ticker)}")
+            print(f"  Name:     {res.name}")
+            print(f"  Currency: {res.currency if res.currency else 'None'}")
+
+            if self.price_info:
+                p = fetch_price(res.ticker, provider=res.provider)
+                if p:
+                    print(f"  Price:    {p}")
+                else:
+                    print("  Price:    [Unavailable]")
+
+
+class AppCLI(BaseSettings, GlobalArgs):
+    """Commodity Registry CLI Application"""
+
+    model_config = SettingsConfigDict(
+        cli_parse_args=True,
+        cli_kebab_case=True,
+        cli_implicit_flags="toggle",
+        cli_hide_none_type=True,
+    )
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return (
+            init_settings,
+            env_settings,
+            dotenv_settings,
+            file_secret_settings,
+            PatchedCliSettingsSource(settings_cls),
+        )
+
+    subcommand: CliSubCommand[resolve | fetch | lint | add]
+
+    def cli_cmd(self) -> None:
+        # Propagate v/vv and format flags from subcommand if root doesn't have them set
+        v = self.v or getattr(self.subcommand, "v", False)
+        vv = self.vv or getattr(self.subcommand, "vv", False)
+        format_val = getattr(self.subcommand, "format", self.format) or self.format
+
+        # Ensure the subcommand instance has the propagated values
+        for attr, val in [("v", v), ("vv", vv), ("format", format_val)]:
+            if hasattr(self.subcommand, attr):
+                setattr(self.subcommand, attr, val)
+
+        setup_logging(v, vv)
+
+        # Explicitly run the correct subcommand to avoid leakage
+        if self.subcommand is not None and hasattr(self.subcommand, "cli_cmd"):
+            self.subcommand.cli_cmd()
+        else:
+            CliApp.run_subcommand(self)
 
 
 def main():
-    default_reg_path = os.getenv("PATH_COMMODITY_REGISTRY", "data/commodities/")
-    parser = argparse.ArgumentParser(description="Commodity Registry CLI")
-    parser.add_argument(
-        "--registry-path",
-        nargs="+",
-        default=[default_reg_path],
-        help="Paths to your user registry files or directories",
-    )
-    parser.add_argument("--no-bundled", action="store_true", help="Do not include bundled database")
-
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    # resolve
-    p_resolve = subparsers.add_parser("resolve", help="Resolve a token to a commodity")
-    p_resolve.add_argument("token", help="ISIN, Ticker, or Name")
-    p_resolve.add_argument("--provider", help="Specific provider for ticker lookup (yahoo, ft)")
-    p_resolve.add_argument("--currency", help="Optional currency for dual-listed instruments")
-    p_resolve.add_argument("--date", help="Verification date (YYYY-MM-DD)")
-    p_resolve.add_argument("--price", type=float, help="Expected price on that date")
-
-    # lint
-    p_lint = subparsers.add_parser("lint", help="Validate registry data")
-    p_lint.add_argument("--path", help="Validate a specific YAML file or directory")
-    p_lint.add_argument(
-        "--verify", action="store_true", help="Perform live cross-check with external providers"
-    )
-    p_lint.add_argument("--only", help="Filter linting to a specific commodity name")
-
-    # add
-    p_add = subparsers.add_parser("add", help="Add a new commodity")
-    p_add.add_argument("token", nargs="?", help="ISIN or Ticker (optional if flags provided)")
-    p_add.add_argument("--name", help="Canonical name (e.g. AAPL)")
-    p_add.add_argument("--isin", help="ISIN code")
-    p_add.add_argument("--ticker", help="Ticker symbol (Yahoo Finance style)")
-    p_add.add_argument("--instrument-type", help="Instrument type (ETF, Stock, etc.)")
-    p_add.add_argument("--asset-class", help="Asset class (EquityETF, Stock, etc.)")
-    p_add.add_argument("--currency", help="Currency (e.g. USD, EUR)")
-    p_add.add_argument("--figi", help="FIGI identifier")
-    p_add.add_argument("--validation-date", help="Validation date (YYYY-MM-DD)")
-    p_add.add_argument("--validation-price", type=float, help="Validation price")
-    p_add.add_argument(
-        "--fetch", action="store_true", help="Fetch metadata online first"
-    )
-    p_add.add_argument("--dry-run", action="store_true", help="Print YAML to console without saving")
-    p_add.add_argument("--verbose", action="store_true", help="Enable verbose output")
-
-    # fetch
-    p_fetch = subparsers.add_parser("fetch", help="Fetch/Discover security details online")
-    p_fetch.add_argument("--isin", help="ISIN to search for")
-    p_fetch.add_argument("--ticker", help="Ticker to fetch metadata for")
-    p_fetch.add_argument("--price", action="store_true", help="Fetch latest market price")
-
-    args = parser.parse_args()
-
-    if args.command == "resolve":
-        resolve_cmd(args)
-    elif args.command == "lint":
-        lint_cmd(args)
-    elif args.command == "add":
-        add_cmd(args)
-    elif args.command == "fetch":
-        fetch_cmd(args)
-
-def fetch_cmd(args):
-    """Searches for a security across providers and prints found details."""
-    from .finder import fetch_price, resolve_security
-    from pydantic_market_data.models import SecurityCriteria
-
-    # Build Criteria
-    criteria = SecurityCriteria(isin=args.isin, symbol=args.ticker)
-    
-    # Use Unified Routine
-    # For fetch, we don't necessarily pass the registry unless we want to prioritize it.
-    # Usually fetch is for discovery, but resolve_security handles both.
-    res = resolve_security(criteria, verify=True)
-    
-    if not res:
-        print("No results found.")
-        return
-
-    print(f"\nFound Details ({res.provider.upper()}):")
-    print(f"  Ticker:   {res.ticker}")
-    print(f"  Name:     {res.name}")
-    print(f"  Currency: {res.currency}")
-    
-    if args.price:
-        price = fetch_price(res.ticker, provider=res.provider)
-        if price:
-            print(f"  Price:    {price}")
-        else:
-            print("  Price:    [Unavailable]")
+    CliApp.run(AppCLI)
 
 
 if __name__ == "__main__":
