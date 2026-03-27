@@ -140,27 +140,33 @@ def search_isin(criteria: SecurityCriteria) -> list[SearchResult]:
     providers = get_available_providers()
 
     for p in providers:
-        data_provider = get_data_provider(p)
-        # Removed try...except to fail fast.
-        # If a provider fails, it should crash the process.
-        symbol_result = data_provider.resolve(criteria)
-        if symbol_result:
-            aclass = (
-                _map_asset_class(symbol_result.asset_class) if symbol_result.asset_class else None
-            )
-            results.append(
-                SearchResult(
-                    provider=p,
-                    ticker=symbol_result.ticker,
-                    name=symbol_result.name,
-                    currency=symbol_result.currency,
-                    asset_class=aclass,
-                    price=None,
-                    price_date=None,
+        try:
+            data_provider = get_data_provider(p)
+            symbol_result = data_provider.resolve(criteria)
+            if symbol_result:
+                aclass = (
+                    _map_asset_class(symbol_result.asset_class)
+                    if symbol_result.asset_class
+                    else None
                 )
+                results.append(
+                    SearchResult(
+                        provider=p,
+                        ticker=symbol_result.ticker,
+                        name=symbol_result.name,
+                        currency=symbol_result.currency,
+                        asset_class=aclass,
+                        price=None,
+                        price_date=None,
+                    )
+                )
+                # Optimization: First match is enough
+                return results
+        except Exception as e:
+            logger.warning(
+                f"Provider {p} failed to resolve {criteria.isin or criteria.symbol}: {e}"
             )
-            # Optimization: First match is enough
-            return results
+            continue
         else:
             logger.debug(f"No results from provider {p} for {criteria.isin or criteria.symbol}")
 

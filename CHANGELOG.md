@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.12] - 2026-03-27
+
+### Changed
+- **Provider Resilience**: Updated `search_isin` to gracefully handle provider failures. If one provider (e.g. Yahoo Finance) fails or times out, the system now logs a warning and continues with other available providers instead of crashing.
+
+## [0.1.11] - 2026-03-27
+
+### Fixed
+- **FX Metadata**: Improved identification of FX instruments as `CASH` asset class.
+- **Name Generation**: Refined name generation for FX pairs to be more Beancount-friendly (avoiding `EURUSD.X` style).
+
+## [0.1.10] - 2026-03-27
+
+### Fixed
+- **Beancount Compatibility**: Updated `res.name` to consistently use the generated Beancount-style name.
+
+## [0.1.9] - 2026-03-26
+
+### Changed
+- **Type Safety**: Enforced strict typing and Namespace Pattern across the codebase for better DX and Mypy compatibility.
+- formatting: Applied unified Ruff formatting.
+
+## [0.1.8] - 2026-03-26
+
+### Fixed
+- Registry: Fixed `AttributeError` in `find_candidates` when certain fields were missing.
+- Release Process: Strengthened automated release scripts and quality gates.
+
 ## [0.1.7] - 2026-02-15
 
 ### Added
