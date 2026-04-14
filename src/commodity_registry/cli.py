@@ -193,7 +193,11 @@ class resolve(CommonArgs):
             p_val = getattr(res.price, "value", res.price) if res.price else 0.0
             p_label = f"Price {res.price_date}" if res.price_date else "Last Price"
             price_str = f" [{p_label}: {p_val:.2f} {res.currency}]" if res.price else ""
-            print(f"Resolved: {res.name} -> {str(res.ticker)} ({res.provider.value}){price_str}")
+            
+            country_str = f" | Country: {res.country}" if res.country else ""
+            meta_str = f" | Meta: {res.metadata}" if res.metadata else ""
+
+            print(f"Resolved: {res.name} -> {str(res.ticker)} ({res.provider.value}){price_str}{country_str}{meta_str}")
 
 
 class lint(CommonArgs):
@@ -425,6 +429,7 @@ class add(CommonArgs):
     )
     currency: CURR | None = Field(None, description="Primary currency")
     figi: str | None = Field(None, description="FIGI identifier")
+    country: str | None = Field(None, description="Country or region of origin")
     validation_date: DATE | None = Field(None, description="Date for initial verification")
     validation_price: PRICE | None = Field(None, description="Price for initial verification")
     fetch_meta: bool = Field(
@@ -516,16 +521,22 @@ class add(CommonArgs):
         if not criteria.symbol and ticker:
             criteria.symbol = ticker
 
-        commodity = add_commodity(
-            criteria=criteria,
-            metadata=metadata,
-            target_path=target_path,
-            instrument_type=inst_type,
-            asset_class=asset_class_val,
-            name=name,
-            dry_run=self.dry_run,
-        )
-        print(f"Successfully processed {commodity.name}")
+        try:
+            commodity = add_commodity(
+                criteria=criteria,
+                metadata=metadata,
+                target_path=target_path,
+                instrument_type=inst_type,
+                asset_class=asset_class_val,
+                name=name,
+                dry_run=self.dry_run,
+                registry=reg,
+                country=self.country,
+            )
+            print(f"Successfully processed {commodity.name}")
+        except ValueError as e:
+            logger.error(str(e))
+            sys.exit(1)
 
 
 class fetch(CommonArgs):

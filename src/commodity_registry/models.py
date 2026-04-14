@@ -122,6 +122,8 @@ class Commodity(BaseModel):
     provider: str | None = None
     risk_profile: RiskProfile | None = None
     liquidity: Liquidity | None = None
+    country: str | None = Field(None, description="Country or region of origin")
+    metadata: dict[str, Any] | None = Field(None, description="Extra metadata")
 
 
 class CommodityFile(BaseModel):

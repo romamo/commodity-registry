@@ -6,7 +6,7 @@ Defines Protocols for type safety and Pydantic models for typed returns.
 
 from datetime import date
 from enum import Enum
-from typing import Protocol
+from typing import Any, Protocol
 
 from pydantic import BaseModel
 from pydantic_market_data.models import (
@@ -64,3 +64,5 @@ class SearchResult(BaseModel):
     instrument_type: InstrumentType | None = None
     price: Price.Input | None = None
     price_date: date | None = None
+    country: str | None = None
+    metadata: dict[str, Any] | None = None

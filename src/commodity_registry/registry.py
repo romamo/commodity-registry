@@ -204,6 +204,8 @@ def add_commodity(
     asset_class: AssetClass,
     name: str | None = None,
     dry_run: bool = False,
+    registry: CommodityRegistry | None = None,
+    country: str | None = None,
 ) -> Commodity:
     """
     Adds a new commodity to the registry.
@@ -238,7 +240,21 @@ def add_commodity(
             # But let's be careful with providers. If it's "YAHOO:^GSPC", we want "^GSPC".
             clean_name = token.split(":")[-1]
 
-    # 3. Build tickers dict (prefer online metadata, fallback to criteria.symbol)
+    # 3. Collision check against entire registry
+    if registry:
+        existing = registry.find_candidates(SecurityCriteria(symbol=clean_name))
+        for match in existing:
+            # If name matches but ISIN is different, it's a collision
+            # unless one of them is missing ISIN (like CASH).
+            # If both are same name, same asset class, same currency, we allow it (update).
+            # If it's a name collision with a different asset class, we warn/error.
+            if match.asset_class != asset_class:
+                raise ValueError(
+                    f"Name collision: '{clean_name}' is already registered as {match.asset_class}. "
+                    f"Refusing to add as {asset_class}."
+                )
+
+    # 4. Build tickers dict (prefer online metadata, fallback to criteria.symbol)
     tickers_dict: dict[str, str] | None = None
     if metadata and metadata.ticker:
         tickers_dict = {metadata.provider.value: str(metadata.ticker)}
@@ -271,6 +287,8 @@ def add_commodity(
         validation_points=[ValidationPoint(date=criteria.target_date, price=criteria.target_price)]
         if criteria.target_date and criteria.target_price is not None
         else None,
+        country=country or (metadata.country if metadata else None),
+        metadata=metadata.metadata if metadata else None,
     )
 
     # 5. Save to file

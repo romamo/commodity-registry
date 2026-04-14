@@ -333,6 +333,8 @@ def resolve_security(
                 instrument_type=cand.instrument_type,
                 price=price,
                 price_date=price_date,
+                country=cand.country,
+                metadata=cand.metadata,
             )
 
     # 2. Programmatic FX Resolution

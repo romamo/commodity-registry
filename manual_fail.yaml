@@ -1,7 +1,0 @@
-commodities:
-- name: INVALID_ITEM
-  isin: US0000000001
-  instrument_type: Stock
-  asset_class: Stock
-  tickers:
-    yahoo: INVALID
