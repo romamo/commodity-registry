@@ -254,8 +254,9 @@ def test_cli_add_success(mock_add, mock_search, mock_registry, capsys):
     assert "Successfully processed AAPL" in capsys.readouterr().out
 
 
+@patch("instrument_registry.finder.get_available_providers", return_value=[ProviderName.YAHOO])
 @patch("instrument_registry.finder.resolve_security")
-def test_cli_fetch_success(mock_resolve, capsys):
+def test_cli_fetch_success(mock_resolve, mock_get_available_providers, capsys):
     mock_resolve.return_value = SearchResult(
         provider=ProviderName.YAHOO, symbol="AAPL", name="Apple Inc.", currency=Currency("USD")
     )
@@ -355,10 +356,18 @@ def test_cli_add_uses_env_write_target(mock_add, mock_search, mock_registry, mon
     assert "Successfully processed AAPL" in capsys.readouterr().out
 
 
+@patch("instrument_registry.finder.get_available_providers", return_value=[ProviderName.YAHOO])
 @patch("instrument_registry.finder.verify_ticker")
 @patch("instrument_registry.finder.fetch_metadata")
 @patch("instrument_registry.finder.resolve_security")
-def test_cli_lint_with_verify(mock_resolve, mock_fetch, mock_verify, mock_registry, capsys):
+def test_cli_lint_with_verify(
+    mock_resolve,
+    mock_fetch,
+    mock_verify,
+    mock_get_available_providers,
+    mock_registry,
+    capsys,
+):
     """Test lint command with verification enabled and detailed audit path."""
     from instrument_registry.models import (
         AssetClass,
@@ -398,7 +407,8 @@ def test_cli_lint_with_verify(mock_resolve, mock_fetch, mock_verify, mock_regist
     assert "Price:    150.0" in output or "OK: Range Match" in output
 
 
-def test_cli_fetch_no_results(capsys):
+@patch("instrument_registry.finder.get_available_providers", return_value=[ProviderName.YAHOO])
+def test_cli_fetch_no_results(mock_get_available_providers, capsys):
     """Test fetch command when no results are found."""
     with patch("instrument_registry.finder.resolve_security", return_value=None):
         main(["fetch", "--symbol", "NONEXISTENT", "--format", "table"])
@@ -436,9 +446,10 @@ def test_cli_lint_verify_requires_providers(mock_get_available_providers, mock_r
     assert "requires the yahoo provider (`py-yfinance`)" in capsys.readouterr().err
 
 
+@patch("instrument_registry.finder.get_available_providers", return_value=[ProviderName.YAHOO])
 @patch("instrument_registry.finder.fetch_price")
 @patch("instrument_registry.finder.resolve_security")
-def test_cli_fetch_with_price(mock_resolve, mock_price, capsys):
+def test_cli_fetch_with_price(mock_resolve, mock_price, mock_get_available_providers, capsys):
     """Test fetch command with price fetching enabled."""
     mock_resolve.return_value = SearchResult(
         provider=ProviderName.YAHOO, symbol="AAPL", name="Apple Inc.", currency=Currency("USD")
