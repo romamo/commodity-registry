@@ -1,6 +1,9 @@
 from unittest.mock import MagicMock, patch
 
-from py_yfinance.source import YFinanceDataSource
+import pytest
+
+py_yfinance_source = pytest.importorskip("py_yfinance.source")
+YFinanceDataSource = py_yfinance_source.YFinanceDataSource
 
 
 # Simple mock for a DataFrame to avoid complex MagicMocking of .iloc
