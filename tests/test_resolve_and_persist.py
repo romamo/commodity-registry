@@ -3,21 +3,21 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic_market_data.models import SecurityCriteria
 
-from commodity_registry.finder import resolve_and_persist
-from commodity_registry.interfaces import SearchResult
-from commodity_registry.registry import CommodityRegistry
+from instrument_registry.finder import resolve_and_persist
+from instrument_registry.interfaces import SearchResult
+from instrument_registry.registry import InstrumentRegistry
 
 
 @pytest.fixture
 def mock_registry(tmp_path):
     # Create a registry backed by a temp file
-    reg = CommodityRegistry(include_bundled=False, extra_paths=[tmp_path])
+    reg = InstrumentRegistry(include_bundled=False, extra_paths=[tmp_path])
     return reg
 
 
-@patch("commodity_registry.finder.search_isin")
-@patch("commodity_registry.finder.resolve_security")
-@patch("commodity_registry.registry.add_commodity")
+@patch("instrument_registry.finder.search_isin")
+@patch("instrument_registry.finder.resolve_security")
+@patch("instrument_registry.registry.add_instrument")
 @patch("platformdirs.user_data_dir")
 def test_resolve_and_persist_new_discovery(
     mock_dirs, mock_add, mock_resolve, mock_search, mock_registry
@@ -31,7 +31,7 @@ def test_resolve_and_persist_new_discovery(
     # Mock resolve_security to return a result (simulating online hit)
     res = SearchResult(
         provider="yahoo",  # ProviderName implicitly handles string if matches
-        ticker="NEW.STOCK",
+        symbol="NEW.STOCK",
         name="New Stock Inc",
         currency="USD",
         asset_class="Stock",
@@ -52,8 +52,8 @@ def test_resolve_and_persist_new_discovery(
     assert str(kwargs["target_path"]) == "/tmp/mock_data_dir"
 
 
-@patch("commodity_registry.finder.resolve_security")
-@patch("commodity_registry.registry.add_commodity")
+@patch("instrument_registry.finder.resolve_security")
+@patch("instrument_registry.registry.add_instrument")
 def test_resolve_and_persist_existing(mock_add, mock_resolve, mock_registry):
     # Setup: Already in registry (simulated by resolve_security returning it from registry check)
     # But wait, resolve_and_persist calls resolve_security FIRST.
@@ -62,7 +62,7 @@ def test_resolve_and_persist_existing(mock_add, mock_resolve, mock_registry):
 
     criteria = SecurityCriteria(symbol="EXISTING", isin="US5949181045")
 
-    res = SearchResult(provider="yahoo", ticker="EXISTING", name="Existing Stock", currency="USD")
+    res = SearchResult(provider="yahoo", symbol="EXISTING", name="Existing Stock", currency="USD")
     mock_resolve.return_value = res
 
     # Mock registry.find_candidates to return a match

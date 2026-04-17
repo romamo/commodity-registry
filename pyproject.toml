@@ -1,37 +1,56 @@
 [project]
-name = "commodity-registry"
+name = "instrument-registry"
 version = "0.2.1"
-description = "Single source of truth for financial instrument data"
+description = "Resolve and maintain canonical financial instrument records from ISINs, symbols, and names"
 authors = [
     { name = "Roman Medvedev", email = "pypi@romavm.dev" }
 ]
 license = "MIT"
 requires-python = ">=3.10"
+keywords = [
+    "finance",
+    "instruments",
+    "registry",
+    "isin",
+    "market-data",
+    "cli",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "pydantic>=2.0",
     "pyyaml>=6.0",
-    "pydantic-market-data==0.1.17",
+    "pydantic-market-data>=0.2.0",
     "diskcache>=5.6.3",
     "platformdirs>=4.9.2",
-    "pydantic-settings>=2.7.1",
-    "py-ftmarkets>=0.1.5",
-    "py-yfinance>=0.1.12",
+    "agentyper==0.1.11",
 ]
 readme = "README.md"
 
 [project.urls]
-Homepage = "https://github.com/romamo/commodity-registry"
-Repository = "https://github.com/romamo/commodity-registry"
-Issues = "https://github.com/romamo/commodity-registry/issues"
+Homepage = "https://github.com/romamo/instrument-registry"
+Repository = "https://github.com/romamo/instrument-registry"
+Issues = "https://github.com/romamo/instrument-registry/issues"
+Changelog = "https://github.com/romamo/instrument-registry/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 providers = [
-    "py-yfinance>=0.1.12",
-    "py-ftmarkets>=0.1.2",
+    "py-yfinance>=0.1.14",
+    "py-ftmarkets>=0.3.0",
 ]
 
 [project.scripts]
-commodity-reg = "commodity_registry.cli:main"
+instrument-reg = "instrument_registry.cli:main"
 
 [dependency-groups]
 dev = [
@@ -48,10 +67,10 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/commodity_registry"]
+packages = ["src/instrument_registry"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/commodity_registry"]
+include = ["src/instrument_registry"]
 exclude = [
     "/.github",
     "/.idea",
@@ -67,4 +86,3 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
-

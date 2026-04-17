@@ -1,9 +1,9 @@
-from commodity_registry.registry import CommodityRegistry, SecurityCriteria
+from instrument_registry.registry import InstrumentRegistry, SecurityCriteria
 
 
 def test_smoke():
     print("Smoke test starting...")
-    registry = CommodityRegistry()
+    registry = InstrumentRegistry()
     assert registry is not None
 
     # Verify search (string wrapped in Criteria)

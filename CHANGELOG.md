@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-04-17
+
+### Changed
+- **Package Rename**: Renamed the distribution and Python package from `commodity-registry` / `commodity_registry` to `instrument-registry` / `instrument_registry`, including bundled data paths and import locations.
+- **CLI Behavior**: Reworked the CLI entrypoint and command structure around `instrument-reg`, with clearer handling for explicit registry write targets and verbosity flags.
+- **Documentation**: Rewrote the README around instrument-focused terminology, installation, configuration, and command examples.
+
+### Fixed
+- **CLI Coverage**: Expanded automated tests for dispatch, verbosity, output formats, and registry path handling to lock in the new command behavior.
+
 ## [0.2.1] - 2026-04-14
 
 ### Changed
@@ -16,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.0] - 2026-03-27
 
 ### Added
-- **Relaxed Commodity Constraints**: Decoupled the registry from strict Beancount naming requirements. Any valid financial symbol (including `^GSPC`, `EURUSD=X`) can now be used as a commodity name without automatic sanitization, increasing flexibility for non-Beancount use cases.
+- **Relaxed Instrument Constraints**: Decoupled the registry from strict Beancount naming requirements. Any valid financial symbol (including `^GSPC`, `EURUSD=X`) can now be used as an instrument name without automatic sanitization, increasing flexibility for non-Beancount use cases.
 
 ## [0.1.12] - 2026-03-27
 
@@ -50,7 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Unified Security Resolution**: Introduced `resolve_security` in `finder.py` as a single entry point for resolving any instrument (Stocks, ETFs, Currencies) across Registry, FX, and Online sources.
-- **Strict Field Lookup**: Refactored `CommodityRegistry` to use `SecurityCriteria` for targeted searching by ISIN, Symbol, or FIGI, improving accuracy over generic string matching.
+- **Strict Field Lookup**: Refactored `InstrumentRegistry` to use `SecurityCriteria` for targeted searching by ISIN, Symbol, or FIGI, improving accuracy over generic string matching.
 
 ### Changed
 - CLI Harmonization: All CLI commands (`resolve`, `fetch`, `add`) now build and use `SecurityCriteria` for consistent data modeling.
@@ -79,7 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Initial release of `commodity-registry`.
+- Initial release of `instrument-registry`.
 - Comprehensive CLI for instrument data management.
 - Support for ISIN, Ticker, and Name mapping.
 - Integration with Yahoo Finance and FT Markets (optional).

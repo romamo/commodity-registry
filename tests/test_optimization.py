@@ -37,9 +37,9 @@ def test_get_price_optimization(mock_ticker_cls):
     mock_ticker_instance.history.return_value = mock_hist
 
     ds = YFinanceDataSource()
-    from pydantic_market_data.models import Ticker
+    from pydantic_market_data.models import Symbol
 
-    price = ds.get_price(Ticker(root="AAPL"))
+    price = ds.get_price(Symbol(root="AAPL"))
 
     from pydantic_market_data.models import Price
 

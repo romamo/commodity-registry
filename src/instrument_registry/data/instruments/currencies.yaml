@@ -1,4 +1,4 @@
-commodities:
+instruments:
   - name: "EUR"
     instrument_type: "Cash"
     asset_class: "Cash"

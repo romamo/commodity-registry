@@ -12,6 +12,19 @@ resolution-markers = [
 ]
 
 [[package]]
+name = "agentyper"
+version = "0.1.11"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "rich" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/52/74/04f07540367420851131f25583ea707699d00bf9e4aa88b0a71c59b69391/agentyper-0.1.11.tar.gz", hash = "sha256:5e0dad82aa4f4736f2c90d0c6bd30cfe18aa97c5483a2ed3a55b2cdf0f930c8f", size = 40647, upload-time = "2026-04-16T17:39:35.576Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/dc/78/0b4cbcf4630d9406c88cb1ede3767f3a6ed6595bc360f391d79bfee774d9/agentyper-0.1.11-py3-none-any.whl", hash = "sha256:adfd1bf7fce5ec016199c13232bebde6e3a6dab2fe39e21ab238a43b07e3fc75", size = 38187, upload-time = "2026-04-16T17:39:36.403Z" },
+]
+
+[[package]]
 name = "annotated-types"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -254,62 +267,6 @@ wheels = [
 ]
 
 [[package]]
-name = "commodity-registry"
-version = "0.2.1"
-source = { editable = "." }
-dependencies = [
-    { name = "diskcache" },
-    { name = "platformdirs" },
-    { name = "py-ftmarkets" },
-    { name = "py-yfinance" },
-    { name = "pydantic" },
-    { name = "pydantic-market-data" },
-    { name = "pydantic-settings" },
-    { name = "pyyaml" },
-]
-
-[package.optional-dependencies]
-providers = [
-    { name = "py-ftmarkets" },
-    { name = "py-yfinance" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "bandit" },
-    { name = "mypy" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-    { name = "types-pyyaml" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "diskcache", specifier = ">=5.6.3" },
-    { name = "platformdirs", specifier = ">=4.9.2" },
-    { name = "py-ftmarkets", specifier = ">=0.1.5" },
-    { name = "py-ftmarkets", marker = "extra == 'providers'", specifier = ">=0.1.2" },
-    { name = "py-yfinance", specifier = ">=0.1.12" },
-    { name = "py-yfinance", marker = "extra == 'providers'", specifier = ">=0.1.12" },
-    { name = "pydantic", specifier = ">=2.0" },
-    { name = "pydantic-market-data", specifier = "==0.1.17" },
-    { name = "pydantic-settings", specifier = ">=2.7.1" },
-    { name = "pyyaml", specifier = ">=6.0" },
-]
-provides-extras = ["providers"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "bandit", specifier = ">=1.8.0" },
-    { name = "mypy", specifier = ">=1.19.1" },
-    { name = "pytest", specifier = ">=8.0.0" },
-    { name = "pytest-cov", specifier = ">=7.0.0" },
-    { name = "ruff", specifier = ">=0.9.2" },
-    { name = "types-pyyaml", specifier = ">=6.0.12.20250915" },
-]
-
-[[package]]
 name = "coverage"
 version = "7.13.5"
 source = { registry = "https://pypi.org/simple" }
@@ -539,6 +496,58 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/72/34/14ca021ce8e5dfedc35312d08ba8bf51fdd999c576889fc2c24cb97f4f10/iniconfig-2.3.0.tar.gz", hash = "sha256:c76315c77db068650d49c5b56314774a7804df16fee4402c1f19d6d15d8c4730", size = 20503, upload-time = "2025-10-18T21:55:43.219Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl", hash = "sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12", size = 7484, upload-time = "2025-10-18T21:55:41.639Z" },
+]
+
+[[package]]
+name = "instrument-registry"
+version = "0.2.1"
+source = { editable = "." }
+dependencies = [
+    { name = "agentyper" },
+    { name = "diskcache" },
+    { name = "platformdirs" },
+    { name = "pydantic" },
+    { name = "pydantic-market-data" },
+    { name = "pyyaml" },
+]
+
+[package.optional-dependencies]
+providers = [
+    { name = "py-ftmarkets" },
+    { name = "py-yfinance" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "bandit" },
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+    { name = "types-pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "agentyper", specifier = "==0.1.11" },
+    { name = "diskcache", specifier = ">=5.6.3" },
+    { name = "platformdirs", specifier = ">=4.9.2" },
+    { name = "py-ftmarkets", marker = "extra == 'providers'", specifier = ">=0.3.0" },
+    { name = "py-yfinance", marker = "extra == 'providers'", specifier = ">=0.1.14" },
+    { name = "pydantic", specifier = ">=2.0" },
+    { name = "pydantic-market-data", specifier = ">=0.2.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
+]
+provides-extras = ["providers"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "bandit", specifier = ">=1.8.0" },
+    { name = "mypy", specifier = ">=1.19.1" },
+    { name = "pytest", specifier = ">=8.0.0" },
+    { name = "pytest-cov", specifier = ">=7.0.0" },
+    { name = "ruff", specifier = ">=0.9.2" },
+    { name = "types-pyyaml", specifier = ">=6.0.12.20250915" },
 ]
 
 [[package]]
@@ -1184,7 +1193,7 @@ wheels = [
 
 [[package]]
 name = "py-ftmarkets"
-version = "0.2.0"
+version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "html5lib" },
@@ -1196,14 +1205,14 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/56/ef/4de93baf6231dd17922509169f26ed2514027a0e7d88eaaab4c403b420dc/py_ftmarkets-0.2.0.tar.gz", hash = "sha256:07692097b7137c43b1f232c4eb6eb0814290228ed953c291540bd0df670f0649", size = 22774, upload-time = "2026-04-03T19:10:46.876Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8e/2a/8cf4bd9850af5ca85d7fe35b68451da25e52c1e026256e29d51e14b2a815/py_ftmarkets-0.3.0.tar.gz", hash = "sha256:b612104d19def5e4cfb10a7f021b11ca707eff866c6b038a3f53c45e4a5e4929", size = 24749, upload-time = "2026-04-14T15:08:07.65Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/be/9f/005a7bf921e2b5d5714b91c0d630beba6880d137a3fd971968493b4b5694/py_ftmarkets-0.2.0-py3-none-any.whl", hash = "sha256:8550539abe68639cb624494676d2aa3219baf58cfaf32efa5f1a9ad4bcb3d438", size = 17649, upload-time = "2026-04-03T19:10:45.969Z" },
+    { url = "https://files.pythonhosted.org/packages/36/1d/fd8d7dc0da9ea80de2baf42dc8c6b3344bebfbe4af9caa4aad0c6e648b40/py_ftmarkets-0.3.0-py3-none-any.whl", hash = "sha256:fc8346d0ab878d133465acad49b507f9fa0b4234dd26a42ec191209fef7ca37b", size = 17634, upload-time = "2026-04-14T15:08:05.909Z" },
 ]
 
 [[package]]
 name = "py-yfinance"
-version = "0.1.12"
+version = "0.1.14"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pycountry" },
@@ -1211,9 +1220,9 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "yfinance" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/22/62/2677a73f81b5bcdc92182808e8b8c625d6d878e81155baa966ff7ed95d9c/py_yfinance-0.1.12.tar.gz", hash = "sha256:278a35051855ff26a8c68688f474ac5c202e5c2edbf9581b980ac1804e432623", size = 12702, upload-time = "2026-04-14T12:31:33.066Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6a/32/81d3f1dfc0fdb6b4ee79ae704940247273fa562351d259631e56fc32a34f/py_yfinance-0.1.14.tar.gz", hash = "sha256:9e332b58be6da273485bef131e2970aeeda2623c536fc902e335aa61ae9a1242", size = 13396, upload-time = "2026-04-14T14:49:07.634Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6b/b4/1603a6ddb30e032e8ff5dfb94bf5c9e6728d539e9cf281535c29fa97c68e/py_yfinance-0.1.12-py3-none-any.whl", hash = "sha256:f3726cb56d7ccc1ad693c3bfa003fcb486a2d698d4e833801bc1eadb538a0a6a", size = 9686, upload-time = "2026-04-14T12:31:34.023Z" },
+    { url = "https://files.pythonhosted.org/packages/62/64/a27fc315e27a257ccce51fcf3b0316816ee808a3eeea33509c2d090fe95f/py_yfinance-0.1.14-py3-none-any.whl", hash = "sha256:33b1e02e684fa653cb2c38492c5abaa1f997f4d99bbebeffc43196fe6de88153", size = 10173, upload-time = "2026-04-14T14:49:06.291Z" },
 ]
 
 [[package]]
@@ -1380,7 +1389,7 @@ wheels = [
 
 [[package]]
 name = "pydantic-market-data"
-version = "0.1.17"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -1390,9 +1399,9 @@ dependencies = [
     { name = "pydantic-extra-types" },
     { name = "pydantic-settings" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3c/7c/e555ef9d11289188debf8b24f00be50147bb1bd682474934370dbed77bac/pydantic_market_data-0.1.17.tar.gz", hash = "sha256:7f9236d023cb2363ccad6b0125d8cd886f664fe16e56071dcdeb60661e1ed31c", size = 13966, upload-time = "2026-04-04T08:23:21.309Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/24/bc/511a23b25268604b647b535cca32a5990ceb97d783e644af173feb714243/pydantic_market_data-0.2.0.tar.gz", hash = "sha256:c55c33a72e15dde4da4e777010d00e2351a59f0905924000ddf000e2952362f0", size = 14145, upload-time = "2026-04-14T13:17:25.623Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fb/e6/f5d0ff87876b35a2570188715b4b0bce252f73bffaba123ec9a60bff2379/pydantic_market_data-0.1.17-py3-none-any.whl", hash = "sha256:97ca94ea24f4ba2ddd45626ee9f06d3b712e14c9f8feca745c44adab6f45c7d9", size = 9602, upload-time = "2026-04-04T08:23:20.455Z" },
+    { url = "https://files.pythonhosted.org/packages/71/aa/09c1ccc71e28aa6bf692ec10494f182f76c1bbce827a350470ffbd23c540/pydantic_market_data-0.2.0-py3-none-any.whl", hash = "sha256:4bfaf62e28f3cf8aeabd5fea367c08c7adc443a5e8364694bf4169f9509abca2", size = 9659, upload-time = "2026-04-14T13:17:24.524Z" },
 ]
 
 [[package]]

@@ -1,25 +1,67 @@
 from __future__ import annotations
 
 import logging
+import os
+import sqlite3
 from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .models import AssetClass
-    from .registry import CommodityRegistry
+    from .registry import InstrumentRegistry
 
 import diskcache  # type: ignore[import-untyped]
 import platformdirs
-from pydantic_market_data.models import Currency, CurrencyCode, Price, SecurityCriteria, Ticker
+from pydantic_market_data.models import (
+    Currency,
+    CurrencyCode,
+    Price,
+    SecurityCriteria,
+    Symbol,
+)
 
-from .interfaces import CommodityLookup, DataProvider, ProviderName, SearchResult
+from .interfaces import DataProvider, InstrumentLookup, ProviderName, SearchResult
 from .models import _map_asset_class
 
 logger = logging.getLogger(__name__)
 
+CACHE_DIR_ENV_VAR = "INSTRUMENT_REGISTRY_CACHE_DIR"
+
+
+def _get_cache_dir() -> Path:
+    """Return the cache directory, allowing an env-var override for sandboxed runs."""
+    cache_dir = os.getenv(CACHE_DIR_ENV_VAR)
+    if cache_dir:
+        return Path(cache_dir).expanduser()
+    return Path(platformdirs.user_cache_dir("instrument-registry"))
+
+
+def _fallback_cache_dir() -> Path:
+    """Use a local cache directory when the platform cache is unavailable."""
+    return Path.cwd() / ".cache" / "instrument-registry"
+
+
+def _init_cache() -> diskcache.Cache:
+    cache_dir = _get_cache_dir()
+    try:
+        return diskcache.Cache(str(cache_dir))
+    except (OSError, sqlite3.OperationalError) as exc:
+        if os.getenv(CACHE_DIR_ENV_VAR):
+            raise
+
+        fallback_dir = _fallback_cache_dir()
+        logger.warning(
+            "Could not open cache directory %s (%s). Falling back to %s.",
+            cache_dir,
+            exc,
+            fallback_dir,
+        )
+        return diskcache.Cache(str(fallback_dir))
+
+
 # Initialize cache (expires in 1 day by default)
-cache = diskcache.Cache(platformdirs.user_cache_dir("commodity-registry"))
+cache = _init_cache()
 
 
 try:
@@ -69,7 +111,7 @@ def get_available_providers() -> list[ProviderName]:
 
 @cache.memoize(expire=86400)  # 24 hours
 def fetch_metadata(
-    ticker: Ticker.Input, isin: str | None = None, provider: ProviderName = ProviderName.YAHOO
+    symbol: Symbol.Input, isin: str | None = None, provider: ProviderName = ProviderName.YAHOO
 ) -> SearchResult | None:
     """
     Fetches common metadata for a security.
@@ -79,24 +121,26 @@ def fetch_metadata(
     # try...except removed to fail fast.
     # data_provider.resolve may raise ValidationError or other source-specific errors.
     # Boundary conversion
-    ticker_vo = Ticker(ticker) if not isinstance(ticker, Ticker) else ticker
-    criteria = SecurityCriteria(symbol=ticker_vo, isin=isin)
-    symbol = data_provider.resolve(criteria)
+    symbol_vo = Symbol(symbol) if not isinstance(symbol, Symbol) else symbol
+    criteria = SecurityCriteria(symbol=symbol_vo, isin=isin)
+    security = data_provider.resolve(criteria)
 
-    if not symbol:
-        logger.debug(f"No symbol resolved for {ticker} via {provider}")
+    if not security:
+        logger.debug(f"No security resolved for {symbol} via {provider}")
         return None
 
     logger.debug(
-        f"Fetched metadata for {ticker} ({provider}): ISIN={getattr(symbol, 'isin', None)}"
+        f"Fetched metadata for {symbol} ({provider}): ISIN={getattr(security, 'isin', None)}"
     )
 
-    currency_val = CurrencyCode(Currency(str(symbol.currency).upper())) if symbol.currency else None
+    currency_val = (
+        CurrencyCode(Currency(str(security.currency).upper())) if security.currency else None
+    )
 
     return SearchResult(
         provider=provider,
-        ticker=symbol.ticker,
-        name=symbol.name,
+        symbol=security.symbol,
+        name=security.name,
         currency=currency_val,
         asset_class=None,  # Not currently resolved via basic symbol search
         instrument_type=None,
@@ -109,7 +153,7 @@ def derive_provider_ticker(
     name: str, asset_class: AssetClass | str | None, provider: ProviderName | str
 ) -> str | None:
     """
-    Derives a provider-specific ticker based on a commodity's name and asset class.
+    Derives a provider-specific ticker based on an instrument's name and asset class.
     Used when an explicit ticker is missing from the registry.
     """
     # Normalize provider name
@@ -135,11 +179,11 @@ def search_isin(criteria: SecurityCriteria) -> list[SearchResult]:
     for p in providers:
         try:
             data_provider = get_data_provider(p)
-            symbol_result = data_provider.resolve(criteria)
-            if symbol_result:
+            security_result = data_provider.resolve(criteria)
+            if security_result:
                 aclass = (
-                    _map_asset_class(symbol_result.asset_class)
-                    if symbol_result.asset_class
+                    _map_asset_class(security_result.asset_class)
+                    if security_result.asset_class
                     else None
                 )
 
@@ -148,16 +192,16 @@ def search_isin(criteria: SecurityCriteria) -> list[SearchResult]:
                     req_aclass = _map_asset_class(criteria.asset_class)
                     if req_aclass and aclass and aclass != req_aclass:
                         logger.debug(
-                            f"Skipping result {symbol_result.ticker} due to asset class mismatch"
+                            f"Skipping result {security_result.symbol} due to asset class mismatch"
                         )
                         continue
 
                 results.append(
                     SearchResult(
                         provider=p,
-                        ticker=symbol_result.ticker,
-                        name=symbol_result.name,
-                        currency=symbol_result.currency,
+                        symbol=security_result.symbol,
+                        name=security_result.name,
+                        currency=security_result.currency,
                         asset_class=aclass,
                         price=None,
                         price_date=None,
@@ -187,7 +231,7 @@ def search_isin(criteria: SecurityCriteria) -> list[SearchResult]:
 
 
 def verify_ticker(
-    ticker: Ticker.Input,
+    symbol: Symbol.Input,
     date: date,
     price: Price.Input,
     provider: ProviderName = ProviderName.YAHOO,
@@ -198,9 +242,9 @@ def verify_ticker(
     data_provider = get_data_provider(provider)
     # try...except removed to fail fast.
     # Boundary conversion
-    ticker_vo = Ticker(ticker) if not isinstance(ticker, Ticker) else ticker
+    symbol_vo = Symbol(symbol) if not isinstance(symbol, Symbol) else symbol
     price_vo = Price(price) if not isinstance(price, Price) else price
-    return data_provider.validate(ticker_vo, date, price_vo)
+    return data_provider.validate(symbol_vo, date, price_vo)
 
 
 def resolve_currency(
@@ -266,7 +310,7 @@ def resolve_currency(
 
     return SearchResult(
         provider=ProviderName.YAHOO,
-        ticker=Ticker(root=ticker),
+        symbol=Symbol(root=ticker),
         name=base,
         currency=CurrencyCode(Currency(quote_str)),
         asset_class=AssetClass.CASH,
@@ -277,7 +321,7 @@ def resolve_currency(
 def resolve_security(
     criteria: SecurityCriteria,
     verify: bool = False,
-    registry: CommodityLookup | None = None,
+    registry: InstrumentLookup | None = None,
     include_price: bool = False,
 ) -> SearchResult | None:
     """
@@ -291,7 +335,7 @@ def resolve_security(
         candidates = registry.find_candidates(criteria)
         if candidates:
             cand = candidates[0]
-            # Convert Commodity to SearchResult
+            # Convert Instrument to SearchResult
             # Determine the best ticker and source from registry + derivation
             best_ticker = None
             source = ProviderName.YAHOO
@@ -324,7 +368,7 @@ def resolve_security(
 
             return SearchResult(
                 provider=source,
-                ticker=Ticker(root=best_ticker) if best_ticker else Ticker(root=cand.name),
+                symbol=Symbol(root=best_ticker) if best_ticker else Symbol(root=cand.name),
                 name=cand.name,
                 currency=cand.currency,
                 asset_class=cand.asset_class,
@@ -360,7 +404,7 @@ def resolve_security(
         # Fetch price (current or historical)
         if include_price:
             target_date = criteria.target_date
-            res.price = fetch_price(res.ticker, provider=res.provider, date=target_date)
+            res.price = fetch_price(res.symbol, provider=res.provider, date=target_date)
             res.price_date = target_date or date.today()
         return res
 
@@ -369,7 +413,7 @@ def resolve_security(
 
 def resolve_and_persist(
     criteria: SecurityCriteria,
-    registry: CommodityRegistry | None = None,
+    registry: InstrumentRegistry | None = None,
     store: bool = True,
     target_path: Path | None = None,
     dry_run: bool = False,
@@ -400,10 +444,10 @@ def resolve_and_persist(
         )
         if not known_candidates:
             # It's a new discovery!
-            logger.info(f"Persisting new discovery: {res.name} ({res.ticker})")
+            logger.info(f"Persisting new discovery: {res.name} ({res.symbol})")
 
             from .models import AssetClass, InstrumentType
-            from .registry import add_commodity
+            from .registry import add_instrument
 
             # Map Metadata to Enums
             inst_type = InstrumentType.STOCK
@@ -442,13 +486,13 @@ def resolve_and_persist(
 
                 import platformdirs
 
-                env_path = os.getenv("COMMODITY_REGISTRY_PATH")
+                env_path = os.getenv("INSTRUMENT_REGISTRY_PATH")
                 if env_path:
                     final_target_path = Path(env_path).expanduser()
                 else:
-                    final_target_path = Path(platformdirs.user_data_dir("commodity-registry"))
+                    final_target_path = Path(platformdirs.user_data_dir("instrument-registry"))
 
-            new_commodity = add_commodity(
+            new_instrument = add_instrument(
                 criteria=criteria,
                 metadata=res,
                 target_path=final_target_path,
@@ -456,7 +500,7 @@ def resolve_and_persist(
                 asset_class=asset_class,
                 dry_run=dry_run,
             )
-            res.name = new_commodity.name
+            res.name = new_instrument.name
 
             if not dry_run:
                 # Refresh registry to include new item
@@ -467,15 +511,15 @@ def resolve_and_persist(
 
 
 def fetch_price(
-    ticker: Ticker.Input, provider: ProviderName = ProviderName.YAHOO, date: date | None = None
+    symbol: Symbol.Input, provider: ProviderName = ProviderName.YAHOO, date: date | None = None
 ) -> Price | None:
     """
     Fetches the price for a ticker (current or historical).
     """
     data_provider = get_data_provider(provider)
     # Boundary conversion
-    ticker_vo = Ticker(ticker) if not isinstance(ticker, Ticker) else ticker
-    val = data_provider.get_price(ticker_vo, date=date)
+    symbol_vo = Symbol(symbol) if not isinstance(symbol, Symbol) else symbol
+    val = data_provider.get_price(symbol_vo, date=date)
     if val is None:
         return None
     # Support both float (from Protocol) and Price (from actual implementations)

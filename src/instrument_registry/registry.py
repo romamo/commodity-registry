@@ -1,13 +1,14 @@
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 import yaml
-from pydantic_market_data.models import Currency, SecurityCriteria, Ticker
+from pydantic_market_data.models import Currency, SecurityCriteria, Symbol
 
 from .interfaces import SearchResult
-from .models import AssetClass, Commodity, CommodityFile, InstrumentType, _map_asset_class
-from .resources import get_commodity_files
+from .models import AssetClass, Instrument, InstrumentFile, InstrumentType, _map_asset_class
+from .resources import get_instrument_files
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 class StrictSafeLoader(yaml.SafeLoader):
     """YAML Loader that disallows duplicate keys."""
 
-    def construct_mapping(self, node, deep=False):
+    def construct_mapping(self, node: yaml.MappingNode, deep: bool = False) -> dict[Any, Any]:
         seen_keys: set = set()
         for key_node, _value_node in node.value:
             key = self.construct_object(key_node, deep=deep)
@@ -27,14 +28,14 @@ class StrictSafeLoader(yaml.SafeLoader):
         return super().construct_mapping(node, deep=deep)
 
 
-class CommodityRegistry:
+class InstrumentRegistry:
     def __init__(self, include_bundled: bool = True, extra_paths: list[Path] | None = None):
-        self._commodities: list[Commodity] = []
+        self._instruments: list[Instrument] = []
         self._load_errors: list[str] = []
-        self._by_isin: dict[str, list[Commodity]] = {}
-        self._by_figi: dict[str, Commodity] = {}
-        self._by_name: dict[str, list[Commodity]] = {}
-        self._by_ticker: dict[str, Commodity] = {}  # Map "PROVIDER:TICKER" -> Commodity
+        self._by_isin: dict[str, list[Instrument]] = {}
+        self._by_figi: dict[str, Instrument] = {}
+        self._by_name: dict[str, list[Instrument]] = {}
+        self._by_ticker: dict[str, Instrument] = {}  # Map "PROVIDER:TICKER" -> Instrument
 
         if include_bundled:
             self.load_bundled_data()
@@ -46,13 +47,13 @@ class CommodityRegistry:
         self._rebuild_indices()
 
     def load_bundled_data(self):
-        """Loads all commodity data from the bundled YAML files."""
+        """Loads all instrument data from the bundled YAML files."""
         logger.debug("Loading bundled registry data...")
-        for file_path in get_commodity_files():
+        for file_path in get_instrument_files():
             self._load_file(file_path)
 
     def load_path(self, path: Path):
-        """Loads commodity data from a specific file or directory (recursively)."""
+        """Loads instrument data from a specific file or directory recursively."""
         logger.debug(f"Loading user registry path: {path}")
         if path.is_dir():
             for p in sorted(path.rglob("*")):
@@ -71,8 +72,8 @@ class CommodityRegistry:
         if not data:
             return
 
-        file_model = CommodityFile(**data)
-        self._commodities.extend(file_model.commodities)
+        file_model = InstrumentFile(**data)
+        self._instruments.extend(file_model.instruments)
 
     @property
     def load_errors(self) -> list[str]:
@@ -80,7 +81,7 @@ class CommodityRegistry:
 
     def _rebuild_indices(self):
         self._by_isin = {}
-        for c in self._commodities:
+        for c in self._instruments:
             if c.isin:
                 isin_key = str(c.isin).upper()
                 if isin_key not in self._by_isin:
@@ -89,31 +90,31 @@ class CommodityRegistry:
 
         self._by_figi = {}
         self._by_name = {}
-        for c in self._commodities:
+        for c in self._instruments:
             name_key = c.name.upper()
             if name_key not in self._by_name:
                 self._by_name[name_key] = []
-            self._by_name[name_key].append(c)
+            self._by_name[name_key].insert(0, c)
 
         self._by_ticker = {}
 
-        for c in self._commodities:
+        for c in self._instruments:
             if c.figi:
                 self._by_figi[c.figi.upper()] = c
 
             if c.tickers:
                 for provider, ticker in c.tickers.model_dump().items():
                     if ticker:
-                        # Later items in self._commodities override earlier ones
+                        # Later items in self._instruments override earlier ones
                         self._by_ticker[f"{provider.upper()}:{str(ticker).upper()}"] = c
 
-    def find_by_isin(self, isin: str, currency: Currency | None = None) -> Commodity | None:
+    def find_by_isin(self, isin: str, currency: Currency | None = None) -> Instrument | None:
         matches = self.find_candidates(SecurityCriteria(isin=isin, currency=currency))
         return matches[0] if matches else None
 
-    def find_candidates(self, criteria: SecurityCriteria) -> list[Commodity]:
+    def find_candidates(self, criteria: SecurityCriteria) -> list[Instrument]:
         """
-        Finds all commodities matching the criteria using strict field lookups.
+        Finds all instruments matching the criteria using strict field lookups.
         Returns empty list if no match.
         """
         candidates = []
@@ -161,38 +162,38 @@ class CommodityRegistry:
 
         return unique_candidates
 
-    def find_by_ticker(self, provider: str, ticker: Ticker | str) -> Commodity | None:
+    def find_by_ticker(self, provider: str, symbol: Symbol | str) -> Instrument | None:
         """
-        Finds a commodity by provider-specific ticker.
+        Finds an instrument by provider-specific ticker.
         Example: find_by_ticker("yahoo", "4GLD.DE")
         """
-        ticker_str = ticker.root if isinstance(ticker, Ticker) else ticker
+        ticker_str = symbol.root if isinstance(symbol, Symbol) else symbol
         return self._by_ticker.get(f"{provider.upper()}:{ticker_str.upper()}")
 
-    def get_all(self) -> list[Commodity]:
-        return self._commodities
+    def get_all(self) -> list[Instrument]:
+        return self._instruments
 
 
 # Default registry if imported directly
 def get_registry(
     include_bundled: bool = True, extra_paths: list[Path] | None = None
-) -> CommodityRegistry:
+) -> InstrumentRegistry:
     if not extra_paths:
-        env_path = os.getenv("COMMODITY_REGISTRY_PATH")
+        env_path = os.getenv("INSTRUMENT_REGISTRY_PATH")
         if env_path:
             extra_paths = [Path(env_path).expanduser()]
         else:
             # Use platformdirs default
             import platformdirs
 
-            default_dir = Path(platformdirs.user_data_dir("commodity-registry"))
+            default_dir = Path(platformdirs.user_data_dir("instrument-registry"))
             if default_dir.exists():
                 extra_paths = [default_dir]
 
-    return CommodityRegistry(include_bundled=include_bundled, extra_paths=extra_paths)
+    return InstrumentRegistry(include_bundled=include_bundled, extra_paths=extra_paths)
 
 
-def add_commodity(
+def add_instrument(
     criteria: SecurityCriteria,
     metadata: SearchResult | None,  # None if not found online
     target_path: Path,
@@ -200,12 +201,12 @@ def add_commodity(
     asset_class: AssetClass,
     name: str | None = None,
     dry_run: bool = False,
-    registry: CommodityRegistry | None = None,
+    registry: InstrumentRegistry | None = None,
     country: str | None = None,
     ibkr: int | None = None,
-) -> Commodity:
+) -> Instrument:
     """
-    Adds a new commodity to the registry.
+    Adds a new instrument to the registry.
 
     Uses SecurityCriteria.symbol (the raw token or security symbol).
     Extracts base ticker (before ':') for Beancount name.
@@ -213,9 +214,9 @@ def add_commodity(
     """
     # 1. Determine ticker
     if not criteria.symbol and not name:
-        if not metadata or not metadata.ticker:
+        if not metadata or not metadata.symbol:
             raise ValueError("SecurityCriteria.symbol or name is required if metadata fetch failed")
-        criteria.symbol = str(metadata.ticker)
+        criteria.symbol = str(metadata.symbol)
 
     # 2. Extract base ticker for Beancount name
     # Example: "ALUM.L" -> "ALUM", "4GLD:GER:EUR" -> "4GLD"
@@ -223,7 +224,7 @@ def add_commodity(
         clean_name = name
     else:
         # Prefer online metadata ticker if available, otherwise fallback to criteria.symbol
-        token = str(metadata.ticker) if metadata and metadata.ticker else str(criteria.symbol or "")
+        token = str(metadata.symbol) if metadata and metadata.symbol else str(criteria.symbol or "")
         if not token:
             # Should not happen given check in step 1, but for mypy
             raise ValueError("Could not determine ticker for name generation")
@@ -252,9 +253,9 @@ def add_commodity(
                 )
 
     # 4. Build tickers dict (prefer online metadata, fallback to criteria.symbol)
-    tickers_dict: dict[str, str] | None = None
-    if metadata and metadata.ticker:
-        tickers_dict = {metadata.provider.value: str(metadata.ticker)}
+    tickers_dict: dict[str, Any] | None = None
+    if metadata and metadata.symbol:
+        tickers_dict = {metadata.provider.value: str(metadata.symbol)}
     elif criteria.symbol:
         symbol_str = str(criteria.symbol)
         # Fallback to yahoo for manual tickers unless it contains a provider prefix
@@ -269,7 +270,7 @@ def add_commodity(
             tickers_dict = {}
         tickers_dict["ibkr"] = ibkr
 
-    # 4. Create commodity
+    # 4. Create instrument
     from .models import Tickers, ValidationPoint
 
     comm_currency = (
@@ -278,7 +279,7 @@ def add_commodity(
         else (metadata.currency if metadata and metadata.currency else Currency("USD"))
     )
 
-    commodity = Commodity(
+    instrument = Instrument(
         name=clean_name,
         isin=criteria.isin,
         figi=None,
@@ -294,21 +295,21 @@ def add_commodity(
     )
 
     # 5. Save to file
-    _save_commodity_to_file(commodity, target_path, dry_run=dry_run)
+    _save_instrument_to_file(instrument, target_path, dry_run=dry_run)
 
-    return commodity
+    return instrument
 
 
-def _save_commodity_to_file(commodity: Commodity, target_path: Path, dry_run: bool = False):
+def _save_instrument_to_file(instrument: Instrument, target_path: Path, dry_run: bool = False):
     """
-    Saves a commodity to the specified YAML file.
+    Saves an instrument to the specified YAML file.
     Handles duplicate checks (ISIN/Name) by reading existing file content first.
     """
     if dry_run:
         logger.info(f"[DRY RUN] Would save to: {target_path}")
         print(
             yaml.dump(
-                {"commodities": [commodity.model_dump(mode="json", exclude_none=True)]},
+                {"instruments": [instrument.model_dump(mode="json", exclude_none=True)]},
                 sort_keys=False,
             )
         )
@@ -323,55 +324,55 @@ def _save_commodity_to_file(commodity: Commodity, target_path: Path, dry_run: bo
         target_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Load existing to check duplicates
-    existing_commodities = []
+    existing_instruments = []
     if target_path.exists():
         with open(target_path) as f:
             data = yaml.load(f, Loader=StrictSafeLoader)  # nosec B506
             if data:
                 # Handle both list and dict formats
                 if isinstance(data, list):
-                    existing_commodities = data
-                elif isinstance(data, dict) and "commodities" in data:
-                    existing_commodities = data["commodities"]
+                    existing_instruments = data
+                elif isinstance(data, dict) and "instruments" in data:
+                    existing_instruments = data["instruments"]
 
     # Check for duplicates and update if needed
-    for i, existing in enumerate(existing_commodities):
+    for i, existing in enumerate(existing_instruments):
         match = False
         if isinstance(existing, dict):
             # Step 1: Strict match by ISIN + Currency
             if (
-                existing.get("isin") == str(commodity.isin) if commodity.isin else False
-            ) and existing.get("currency") == str(commodity.currency):
+                existing.get("isin") == str(instrument.isin) if instrument.isin else False
+            ) and existing.get("currency") == str(instrument.currency):
                 logger.info(
-                    f"Updating existing record for {commodity.name} "
-                    f"({commodity.currency}) via ISIN match"
+                    f"Updating existing record for {instrument.name} "
+                    f"({instrument.currency}) via ISIN match"
                 )
                 match = True
             # Step 2: Fallback to Name match
-            elif existing.get("name") == commodity.name:
-                logger.info(f"Updating existing record for {commodity.name} via name match")
+            elif existing.get("name") == instrument.name:
+                logger.info(f"Updating existing record for {instrument.name} via name match")
                 match = True
 
             if match:
                 # Update existing record with new data
-                updated_data = commodity.model_dump(mode="json", exclude_none=True)
-                existing_commodities[i] = updated_data
-                _save_to_yaml(data, existing_commodities, target_path)
+                updated_data = instrument.model_dump(mode="json", exclude_none=True)
+                existing_instruments[i] = updated_data
+                _save_to_yaml(data, existing_instruments, target_path)
                 return
 
     # Append new if no match found
-    existing_commodities.append(commodity.model_dump(mode="json", exclude_none=True))
-    _save_to_yaml(data, existing_commodities, target_path)
+    existing_instruments.append(instrument.model_dump(mode="json", exclude_none=True))
+    _save_to_yaml(data, existing_instruments, target_path)
 
-    logger.info(f"Auto-added {commodity.name} to {target_path}")
+    logger.info(f"Auto-added {instrument.name} to {target_path}")
 
 
-def _save_to_yaml(data: dict | None, commodities: list[dict], target_path: Path) -> None:
-    if isinstance(data, dict) and "commodities" in data:
+def _save_to_yaml(data: dict | None, instruments: list[dict], target_path: Path) -> None:
+    if isinstance(data, dict) and "instruments" in data:
         data_to_dump = data
-        data_to_dump["commodities"] = commodities
+        data_to_dump["instruments"] = instruments
     else:
-        data_to_dump = {"commodities": commodities}
+        data_to_dump = {"instruments": instruments}
 
     with open(target_path, "w") as f:
         yaml.dump(data_to_dump, f, sort_keys=False)

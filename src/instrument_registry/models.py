@@ -93,7 +93,7 @@ class ValidationPoint(BaseModel):
         return v
 
 
-class Commodity(BaseModel):
+class Instrument(BaseModel):
     name: str = Field(..., description="Canonical financial symbol", pattern=r"^\S+$")
     isin: ISIN.Input | None = None
     figi: str | None = Field(None, description="Composite FIGI identifier")
@@ -112,5 +112,5 @@ class Commodity(BaseModel):
     metadata: dict[str, Any] | None = Field(None, description="Extra metadata")
 
 
-class CommodityFile(BaseModel):
-    commodities: list[Commodity]
+class InstrumentFile(BaseModel):
+    instruments: list[Instrument]

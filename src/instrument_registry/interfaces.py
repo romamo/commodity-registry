@@ -1,5 +1,5 @@
 """
-Interface definitions for commodity registry.
+Interface definitions for instrument registry.
 
 Defines Protocols for type safety and Pydantic models for typed returns.
 """
@@ -13,12 +13,12 @@ from pydantic_market_data.models import (
     Currency,
     CurrencyCode,
     Price,
+    Security,
     SecurityCriteria,
     Symbol,
-    Ticker,
 )
 
-from .models import AssetClass, Commodity, InstrumentType
+from .models import AssetClass, Instrument, InstrumentType
 
 
 class ProviderName(str, Enum):
@@ -30,34 +30,34 @@ class ProviderName(str, Enum):
 class DataProvider(Protocol):
     """Protocol for market data providers (Yahoo, FT, etc.)"""
 
-    def resolve(self, criteria: SecurityCriteria) -> Symbol | None:
+    def resolve(self, criteria: SecurityCriteria) -> Security | None:
         """Resolve security using search criteria"""
         ...
 
-    def validate(self, ticker: Ticker.Input, date: date, price: Price.Input) -> bool:
+    def validate(self, symbol: Symbol.Input, date: date, price: Price.Input) -> bool:
         """Verify price against historical data"""
         ...
 
-    def get_price(self, ticker: Ticker.Input, date: date | None = None) -> float | None:
+    def get_price(self, symbol: Symbol.Input, date: date | None = None) -> float | None:
         """Fetch the price for a ticker (current or historical)"""
         ...
 
 
-class CommodityLookup(Protocol):
-    """Protocol for commodity lookup operations"""
+class InstrumentLookup(Protocol):
+    """Protocol for instrument lookup operations"""
 
-    def find_by_isin(self, isin: str, currency: Currency | None = None) -> Commodity | None: ...
+    def find_by_isin(self, isin: str, currency: Currency | None = None) -> Instrument | None: ...
 
-    def find_candidates(self, criteria: SecurityCriteria) -> list[Commodity]: ...
+    def find_candidates(self, criteria: SecurityCriteria) -> list[Instrument]: ...
 
-    def find_by_ticker(self, provider: str, ticker: Ticker.Input) -> Commodity | None: ...
+    def find_by_ticker(self, provider: str, symbol: Symbol.Input) -> Instrument | None: ...
 
 
 class SearchResult(BaseModel):
     """Result from multi-provider search"""
 
     provider: ProviderName
-    ticker: Ticker.Input
+    symbol: Symbol.Input
     name: str
     currency: CurrencyCode.Input | None = None
     asset_class: AssetClass | None = None

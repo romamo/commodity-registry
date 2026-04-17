@@ -1,4 +1,4 @@
-commodities:
+instruments:
 - name: GRDYNAMIK
   isin: DE000A0H0W99
   instrument_type: ETF
@@ -58,7 +58,6 @@ commodities:
   tickers:
     yahoo: JPY=X
 - name: AAPL
-  isin: US0378331005
   instrument_type: Stock
   asset_class: Stock
   currency: USD

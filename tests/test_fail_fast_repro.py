@@ -1,6 +1,6 @@
 import pytest
 
-from commodity_registry.registry import CommodityRegistry
+from instrument_registry.registry import InstrumentRegistry
 
 
 def test_registry_fail_fast_on_invalid_yaml(tmp_path):
@@ -11,7 +11,7 @@ def test_registry_fail_fast_on_invalid_yaml(tmp_path):
     # Create invalid YAML file
     invalid_yaml = tmp_path / "manual.yaml"
     content = """
-commodities:
+instruments:
 - name: INVALID_COMMODITY
   isin: US0000000001
   instrument_type: Stock
@@ -26,7 +26,7 @@ commodities:
     # We expect pydantic.ValidationError or similar to be raised
     with pytest.raises(Exception) as excinfo:
         # Load registry with only this path
-        CommodityRegistry(include_bundled=False, extra_paths=[invalid_yaml])
+        InstrumentRegistry(include_bundled=False, extra_paths=[invalid_yaml])
 
     # Verify the error message contains relevant details if possible,
     # but primarily we just want it to crash (raise) instead of swallowing the error.

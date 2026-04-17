@@ -1,9 +1,9 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Commodity Registry",
+  "title": "Instrument Registry",
   "type": "object",
   "properties": {
-    "commodities": {
+    "instruments": {
       "type": "array",
       "items": {
         "type": "object",
@@ -12,7 +12,7 @@
           "name": {
             "type": "string",
             "pattern": "^[A-Z][A-Z0-9\\\\._-]*$",
-            "description": "Canonical Beancount commodity name"
+            "description": "Canonical Beancount instrument name"
           },
           "isin": { "type": "string", "pattern": "^[A-Z]{2}[A-Z0-9]{9}\\d$" },
           "figi": { "type": "string" },

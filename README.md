@@ -1,47 +1,79 @@
-# Commodity Registry
+# Instrument Registry
 
-Single source of truth for financial instrument data.
-Used to map ISINs, Tickers, and Names to canonical commodity identifiers for Beancount and other financial tools.
+Resolve and maintain canonical financial instrument records.
+`instrument-reg` maps ISINs, provider symbols, names, and other identifiers to a
+consistent local registry for Beancount and other financial workflows.
+
+## Why Use It
+
+- resolve an instrument from a flexible query like an ISIN, symbol, name, conid, or FX pair
+- keep a local instrument registry with explicit, predictable write paths
+- validate bundled and user-defined instrument data
+- fetch provider-backed details without giving up local registry precedence
 
 ## Concepts
 
 - **Canonical Name**: The unique identifier used in Beancount ledgers (e.g., `AAPL`, `CSPX`).
-- **ISIN**: International Securities Identification Number (e.g., `US0378331005`). primary key for resolution.
+- **ISIN**: International Securities Identification Number (e.g., `US0378331005`). Primary identifier for many instruments.
 - **FIGI**: Financial Instrument Global Identifier.
-- **Ticker**: Provider-specific symbol (e.g., `AAPL` for Yahoo, `CSPX.L` for Yahoo).
+- **Query**: User input to `resolve` or `add`, such as an ISIN, provider symbol, name, conid, or FX pair.
+- **Provider Symbol**: Provider-specific market symbol (e.g., `AAPL` on Yahoo, `CSPX.L` on Yahoo).
 
 ## Installation
 
 ```bash
-uv tool install commodity-registry
+uv tool install instrument-registry
+```
+
+Install optional live-data providers when you want external resolution and verification:
+
+```bash
+uv tool install 'instrument-registry[providers]'
 ```
 
 ## Configuration
 
 The registry loads data from two sources:
-1.  **Bundled Data**: Built-in commodities (ETFs, Stocks).
-2.  **User Data**: Custom YAML files located at `COMMODITY_REGISTRY_PATH`.
+1.  **Bundled Data**: Built-in instruments (ETFs, Stocks).
+2.  **User Data**: Custom YAML files located at `INSTRUMENT_REGISTRY_PATH`.
 
 Set the environment variable to point to your custom registry:
 
 ```bash
-export COMMODITY_REGISTRY_PATH=~/path/to/my/registry
+export INSTRUMENT_REGISTRY_PATH=~/path/to/my/registry
 ```
 
 The registry recursively scans this directory for `.yaml` and `.yml` files.
 
-## Usage
+Read precedence for CLI commands is:
+- user-defined registry paths first
+- bundled registry second
 
-### Resolve a Token
-Find the canonical commodity for an ISIN, Ticker, or Name.
+Write behavior for `add` is strict:
+- `instrument-reg add` writes only when `INSTRUMENT_REGISTRY_PATH` is set or `--registry-path` is passed
+- `--registry-path` is a command option, so pass it after the subcommand, for example `instrument-reg add --registry-path ~/registry ...`
+- if neither is set, the command fails instead of guessing a write location
+
+Network lookup caching uses the platform cache directory by default. For sandboxed
+development or CI runs, you can override it with `INSTRUMENT_REGISTRY_CACHE_DIR`:
 
 ```bash
-commodity-reg resolve US0378331005
-# Output: Resolved: AAPL
+export INSTRUMENT_REGISTRY_CACHE_DIR=.cache/instrument-registry
+```
+
+## Usage
+
+### Resolve a Query
+Resolve a query from local registries first, then external providers if needed.
+Queries can be ISINs, provider symbols, names, IBKR conids, or common FX pairs.
+
+```bash
+instrument-reg resolve US0378331005
+# Output: Resolved: Apple Inc. -> AAPL (yahoo)
 ```
 
 ### Automatic Currency Resolution
-The registry programmatically resolves standard currencies to Yahoo tickers if they are not in your custom registry:
+The resolver can derive common FX provider symbols when they are not already in your registry:
 - `resolve EUR` -> `EURUSD=X`
 - `resolve EUR/JPY` -> `EURJPY=X`
 - `resolve USD/JPY` -> `JPY=X`
@@ -50,39 +82,54 @@ This eliminates the need to manually define standard Forex pairs in your registr
 
 With price verification (checks if price matches historical data):
 ```bash
-commodity-reg resolve US0378331005 --date 2024-01-01 --price 185.00
+instrument-reg resolve US0378331005 --date 2024-01-01 --price 185.00
 ```
 
-### Add a Commodity
-Add a new commodity to your local registry.
+### Add an Instrument
+Add a new instrument to your local registry.
+
+`add` requires an explicit write target. Set `INSTRUMENT_REGISTRY_PATH` or pass `--registry-path`.
 
 ```bash
-# Auto-fetch metadata from Yahoo Finance
-commodity-reg add US0378331005 --fetch
+# Auto-fetch metadata into an explicit user registry path
+instrument-reg add --registry-path ~/registry US0378331005 --fetch
 
-# Manually specify details
-commodity-reg add --name AAPL --isin US0378331005 --ticker AAPL --instrument-type Stock --asset-class Stock --currency USD
+# Manually specify details with an environment-defined write target
+INSTRUMENT_REGISTRY_PATH=~/registry instrument-reg add \
+  --name AAPL \
+  --isin US0378331005 \
+  --symbol AAPL \
+  --instrument-type Stock \
+  --asset-class Stock \
+  --currency USD
 ```
 
 ### Linting
-Validate your registry data and check for duplicates.
+Validate registry files and check for duplicates.
 
 ```bash
-commodity-reg lint
+instrument-reg lint
 ```
 
 Verify against live market data (checks if tickers are valid):
 
 ```bash
-commodity-reg lint --verify
+instrument-reg lint --verify
 ```
 
 ### Fetch Metadata
-Look up security details from online providers (Yahoo Finance, FT).
+Fetch details using local registries first, then provider lookup when needed.
 
 ```bash
-commodity-reg fetch --isin US0378331005
+instrument-reg fetch --isin US0378331005
 ```
+
+### Command Summary
+
+- `resolve`: resolve a query from local registries first, then external providers
+- `add`: add or update an instrument in an explicit user registry path
+- `fetch`: inspect provider details using local registry precedence first
+- `lint`: validate registry files and optionally verify live provider data
 
 
 ## Programmatic Usage
@@ -90,31 +137,34 @@ commodity-reg fetch --isin US0378331005
 You can use the registry in your Python scripts:
 
 ```python
-from commodity_registry.registry import get_registry
+from pydantic_market_data.models import SecurityCriteria
+
+from instrument_registry.registry import get_registry
 
 # Initialize registry (loads bundled data + user data from env var)
 reg = get_registry()
 
 # 1. Resolve by ISIN
-commodity = reg.find_by_isin("US0378331005")
-if commodity:
-    print(f"Name: {commodity.name}, Currency: {commodity.currency}")
+instrument = reg.find_by_isin("US0378331005")
+if instrument:
+    print(f"Name: {instrument.name}, Currency: {instrument.currency}")
 
-# 2. Search by any token (ISIN, Name, FIGI)
-candidates = reg.find_candidates("AAPL")
+# 2. Search by identifier fields
+criteria = SecurityCriteria(symbol="AAPL")
+candidates = reg.find_candidates(criteria)
 for c in candidates:
     print(f"Found: {c.name} ({c.isin})")
 
-# 3. Look up by ticker
-# Note: Ticker lookup requires the provider name
-comm = reg.find_by_ticker("yahoo", "AAPL")
+# 3. Look up by provider symbol
+# Note: Provider-symbol lookup requires the provider name
+instrument = reg.find_by_ticker("yahoo", "AAPL")
 ```
 
 
 ## Data Format (YAML)
 
 ```yaml
-commodities:
+instruments:
   - name: AAPL
     isin: US0378331005
     instrument_type: Stock
@@ -129,5 +179,5 @@ commodities:
 
 ## Contributing
 
-- **Bundled Data**: Submit a PR to add common instruments to `src/commodity_registry/data/commodities/`.
-- **Providers**: Implement new data sources in `src/commodity_registry/finder.py` by adding a class that implements the `DataSource` interface.
+- **Bundled Data**: Submit a PR to add common instruments to `src/instrument_registry/data/instruments/`.
+- **Providers**: Implement new data sources in `src/instrument_registry/finder.py` by adding a class that implements the `DataProvider` protocol.

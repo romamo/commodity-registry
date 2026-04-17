@@ -2,20 +2,20 @@ import importlib.resources
 from collections.abc import Iterator
 from pathlib import Path
 
-PACKAGE_DATA_PATH = "commodity_registry.data"
-COMMODITIES_DIR = "commodities"
+PACKAGE_DATA_PATH = "instrument_registry.data"
+INSTRUMENTS_DIR = "instruments"
 
 
 def get_schema_path() -> Path:
     """Returns the path to the bundled JSON schema."""
     return Path(
-        str(importlib.resources.files(PACKAGE_DATA_PATH).joinpath("commodities.schema.json"))
+        str(importlib.resources.files(PACKAGE_DATA_PATH).joinpath("instruments.schema.json"))
     )
 
 
-def get_commodity_files() -> Iterator[Path]:
-    """Yields paths to all bundled YAML commodity files."""
-    data_dir = importlib.resources.files(PACKAGE_DATA_PATH).joinpath(COMMODITIES_DIR)
+def get_instrument_files() -> Iterator[Path]:
+    """Yields paths to all bundled YAML instrument files."""
+    data_dir = importlib.resources.files(PACKAGE_DATA_PATH).joinpath(INSTRUMENTS_DIR)
     if not data_dir.is_dir():
         return
 
