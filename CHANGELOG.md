@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5] - 2026-04-22
+
+### Changed
+- **Type inference**: Extracted a shared `_infer_types()` helper in `finder.py`, eliminating the duplicated if/elif chain that mapped raw asset-class strings to `InstrumentType`/`AssetClass` enums.
+- **`add_instrument` signature**: `instrument_type` and `asset_class` are now optional; values are resolved from provider `SearchResult` metadata before falling back to a clear `ValueError` if still unresolved.
+- **CLI `add` command**: `--instrument-type` and `--asset-class` are no longer required upfront; they may be omitted when `--fetch` is used and the provider supplies type information.
+- **Dependency**: Bumped `agentyper` to 0.1.12.
+
 ## [0.2.4] - 2026-04-17
 
 ### Fixed

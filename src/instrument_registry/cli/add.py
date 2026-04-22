@@ -5,7 +5,7 @@ from typing import Any
 
 import agentyper as typer
 import pandas as pd  # type: ignore[import-untyped]
-from pydantic_market_data.models import ISIN, Currency, CurrencyCode, Price, SecurityCriteria
+from pydantic_market_data.models import Currency, CurrencyCode, Price, SecurityCriteria
 
 from ..models import AssetClass, InstrumentType
 from . import common
@@ -92,7 +92,7 @@ def command(
     if query:
         if common.is_isin(query):
             if not final_isin:
-                final_isin = ISIN(query)
+                final_isin = query
         elif not ticker:
             ticker = query
 
@@ -134,8 +134,6 @@ def command(
             )
             if not criteria.symbol:
                 criteria.symbol = metadata_symbol
-            if not name:
-                name = str(metadata.name)
             if not currency:
                 metadata_currency = (
                     metadata.currency.root
@@ -152,10 +150,6 @@ def command(
     missing = []
     if not final_isin and not ticker:
         missing.append("--isin or --symbol")
-    if not instrument_type:
-        missing.append("--instrument-type")
-    if not asset_class:
-        missing.append("--asset-class")
     if not currency:
         missing.append("--currency")
 
@@ -170,8 +164,8 @@ def command(
             criteria=criteria,
             metadata=metadata,
             target_path=target_path,
-            instrument_type=InstrumentType(instrument_type),
-            asset_class=AssetClass(asset_class),
+            instrument_type=InstrumentType(instrument_type) if instrument_type else None,
+            asset_class=AssetClass(asset_class) if asset_class else None,
             name=name,
             dry_run=dry_run,
             registry=reg,

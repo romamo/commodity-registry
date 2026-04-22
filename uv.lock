@@ -13,15 +13,15 @@ resolution-markers = [
 
 [[package]]
 name = "agentyper"
-version = "0.1.11"
+version = "0.1.12"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
     { name = "rich" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/52/74/04f07540367420851131f25583ea707699d00bf9e4aa88b0a71c59b69391/agentyper-0.1.11.tar.gz", hash = "sha256:5e0dad82aa4f4736f2c90d0c6bd30cfe18aa97c5483a2ed3a55b2cdf0f930c8f", size = 40647, upload-time = "2026-04-16T17:39:35.576Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a4/87/d32445ec3a52eccfbba8af4b8df769e5280c3bf12878990aa044b5806732/agentyper-0.1.12.tar.gz", hash = "sha256:a65b81472702095b2f66fb8f857332aa64deed3dc9b195692bf35eab0c4539f0", size = 42923, upload-time = "2026-04-17T07:57:22.887Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/dc/78/0b4cbcf4630d9406c88cb1ede3767f3a6ed6595bc360f391d79bfee774d9/agentyper-0.1.11-py3-none-any.whl", hash = "sha256:adfd1bf7fce5ec016199c13232bebde6e3a6dab2fe39e21ab238a43b07e3fc75", size = 38187, upload-time = "2026-04-16T17:39:36.403Z" },
+    { url = "https://files.pythonhosted.org/packages/72/83/2765a22f8aad388675b5108d49a0d0aea7cc8446458e40b6f075e704c0e7/agentyper-0.1.12-py3-none-any.whl", hash = "sha256:585d37b8dbd51b481fdc62d48433c995dc535257baec9649772c1c5814cc7f79", size = 39749, upload-time = "2026-04-17T07:57:23.806Z" },
 ]
 
 [[package]]
@@ -529,7 +529,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agentyper", specifier = "==0.1.11" },
+    { name = "agentyper", specifier = "==0.1.12" },
     { name = "diskcache", specifier = ">=5.6.3" },
     { name = "platformdirs", specifier = ">=4.9.2" },
     { name = "py-ftmarkets", marker = "extra == 'providers'", specifier = ">=0.3.0" },

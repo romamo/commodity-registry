@@ -197,8 +197,8 @@ def add_instrument(
     criteria: SecurityCriteria,
     metadata: SearchResult | None,  # None if not found online
     target_path: Path,
-    instrument_type: InstrumentType,
-    asset_class: AssetClass,
+    instrument_type: InstrumentType | None = None,
+    asset_class: AssetClass | None = None,
     name: str | None = None,
     dry_run: bool = False,
     registry: InstrumentRegistry | None = None,
@@ -212,6 +212,12 @@ def add_instrument(
     Extracts base ticker (before ':') for Beancount name.
     Stores provider-specific tickers only if found online.
     """
+    if metadata:
+        if instrument_type is None:
+            instrument_type = metadata.instrument_type
+        if asset_class is None:
+            asset_class = metadata.asset_class
+
     # 1. Determine ticker
     if not criteria.symbol and not name:
         if not metadata or not metadata.symbol:
@@ -271,6 +277,13 @@ def add_instrument(
         tickers_dict["ibkr"] = ibkr
 
     # 4. Create instrument
+    if instrument_type is None:
+        raise ValueError(
+            "--instrument-type is required (could not be inferred from provider metadata)"
+        )
+    if asset_class is None:
+        raise ValueError("--asset-class is required (could not be inferred from provider metadata)")
+
     from .models import Tickers, ValidationPoint
 
     comm_currency = (

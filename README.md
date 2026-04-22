@@ -91,10 +91,10 @@ Add a new instrument to your local registry.
 `add` requires an explicit write target. Set `INSTRUMENT_REGISTRY_PATH` or pass `--registry-path`.
 
 ```bash
-# Auto-fetch metadata into an explicit user registry path
+# Auto-fetch metadata — instrument type and asset class are inferred from the provider
 instrument-reg add --registry-path ~/registry US0378331005 --fetch
 
-# Manually specify details with an environment-defined write target
+# Manually specify all details (instrument-type and asset-class are required without --fetch)
 INSTRUMENT_REGISTRY_PATH=~/registry instrument-reg add \
   --name AAPL \
   --isin US0378331005 \

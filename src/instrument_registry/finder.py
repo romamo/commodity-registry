@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from .models import AssetClass
     from .registry import InstrumentRegistry
 
 import diskcache  # type: ignore[import-untyped]
@@ -22,11 +21,28 @@ from pydantic_market_data.models import (
 )
 
 from .interfaces import DataProvider, InstrumentLookup, ProviderName, SearchResult
-from .models import _map_asset_class
+from .models import AssetClass, InstrumentType, _map_asset_class
 
 logger = logging.getLogger(__name__)
 
 CACHE_DIR_ENV_VAR = "INSTRUMENT_REGISTRY_CACHE_DIR"
+
+_RAW_TYPE_MAP: list[tuple[str, InstrumentType, AssetClass]] = [
+    ("ETF", InstrumentType.ETF, AssetClass.EQUITY_ETF),
+    ("MUTUALFUND", InstrumentType.ETF, AssetClass.EQUITY_ETF),
+    ("INDEX", InstrumentType.INDEX, AssetClass.STOCK),
+    ("CRYPTOCURRENCY", InstrumentType.CRYPTO, AssetClass.CRYPTO),
+    ("CURRENCY", InstrumentType.CASH, AssetClass.CASH),
+    ("CASH", InstrumentType.CASH, AssetClass.CASH),
+]
+
+
+def _infer_types(raw_asset_class: str | None) -> tuple[InstrumentType, AssetClass]:
+    raw = (raw_asset_class or "").upper()
+    for keyword, inst_type, asset_class in _RAW_TYPE_MAP:
+        if keyword in raw:
+            return inst_type, asset_class
+    return InstrumentType.STOCK, AssetClass.STOCK
 
 
 def _get_cache_dir() -> Path:
@@ -196,13 +212,15 @@ def search_isin(criteria: SecurityCriteria) -> list[SearchResult]:
                         )
                         continue
 
+                inst_type, resolved_aclass = _infer_types(security_result.asset_class)
                 results.append(
                     SearchResult(
                         provider=p,
                         symbol=security_result.symbol,
                         name=security_result.name,
                         currency=security_result.currency,
-                        asset_class=aclass,
+                        asset_class=aclass or resolved_aclass,
+                        instrument_type=inst_type,
                         price=None,
                         price_date=None,
                     )
@@ -446,30 +464,9 @@ def resolve_and_persist(
             # It's a new discovery!
             logger.info(f"Persisting new discovery: {res.name} ({res.symbol})")
 
-            from .models import AssetClass, InstrumentType
             from .registry import add_instrument
 
-            # Map Metadata to Enums
-            inst_type = InstrumentType.STOCK
-            asset_class = AssetClass.STOCK
-
-            raw_type = (res.asset_class or "").upper()
-
-            if "ETF" in raw_type:
-                inst_type = InstrumentType.ETF
-                asset_class = AssetClass.EQUITY_ETF
-            elif "MUTUALFUND" in raw_type:
-                inst_type = InstrumentType.ETF
-                asset_class = AssetClass.EQUITY_ETF
-            elif "INDEX" in raw_type:
-                inst_type = InstrumentType.INDEX
-                asset_class = AssetClass.STOCK
-            elif "CRYPTOCURRENCY" in raw_type:
-                inst_type = InstrumentType.CRYPTO
-                asset_class = AssetClass.CRYPTO
-            elif "CURRENCY" in raw_type or "CASH" in raw_type:
-                inst_type = InstrumentType.CASH
-                asset_class = AssetClass.CASH
+            inst_type, asset_class = _infer_types(res.asset_class)
 
             # Do not persist CASH/CURRENCY to file
             if inst_type == InstrumentType.CASH or asset_class == AssetClass.CASH:
