@@ -14,7 +14,7 @@ from pydantic_market_data.models import (
     CurrencyCode,
     Price,
     Security,
-    SecurityCriteria,
+    SecurityQuery,
     Symbol,
 )
 
@@ -30,7 +30,7 @@ class ProviderName(str, Enum):
 class DataProvider(Protocol):
     """Protocol for market data providers (Yahoo, FT, etc.)"""
 
-    def resolve(self, criteria: SecurityCriteria) -> Security | None:
+    def resolve(self, criteria: SecurityQuery) -> Security | None:
         """Resolve security using search criteria"""
         ...
 
@@ -48,7 +48,7 @@ class InstrumentLookup(Protocol):
 
     def find_by_isin(self, isin: str, currency: Currency | None = None) -> Instrument | None: ...
 
-    def find_candidates(self, criteria: SecurityCriteria) -> list[Instrument]: ...
+    def find_candidates(self, criteria: SecurityQuery) -> list[Instrument]: ...
 
     def find_by_ticker(self, provider: str, symbol: Symbol.Input) -> Instrument | None: ...
 

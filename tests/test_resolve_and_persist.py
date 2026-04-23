@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from pydantic_market_data.models import SecurityCriteria
+from pydantic_market_data.models import SecurityQuery
 
 from instrument_registry.finder import resolve_and_persist
 from instrument_registry.interfaces import SearchResult
@@ -26,7 +26,7 @@ def test_resolve_and_persist_new_discovery(
     mock_dirs.return_value = "/tmp/mock_data_dir"
 
     # Setup: Not in registry, but found online
-    criteria = SecurityCriteria(symbol="NEW.STOCK", isin="US0378331005")
+    criteria = SecurityQuery(symbol="NEW.STOCK", isin="US0378331005")
 
     # Mock resolve_security to return a result (simulating online hit)
     res = SearchResult(
@@ -60,7 +60,7 @@ def test_resolve_and_persist_existing(mock_add, mock_resolve, mock_registry):
     # If resolve_security returns it, we need to know if it came from registry or online.
     # resolve_and_persist checks registry manually to decide if it should store.
 
-    criteria = SecurityCriteria(symbol="EXISTING", isin="US5949181045")
+    criteria = SecurityQuery(symbol="EXISTING", isin="US5949181045")
 
     res = SearchResult(provider="yahoo", symbol="EXISTING", name="Existing Stock", currency="USD")
     mock_resolve.return_value = res

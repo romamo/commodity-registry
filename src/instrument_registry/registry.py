@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic_market_data.models import Currency, SecurityCriteria, Symbol
+from pydantic_market_data.models import Currency, SecurityQuery, Symbol
 
 from .interfaces import SearchResult
 from .models import AssetClass, Instrument, InstrumentFile, InstrumentType, _map_asset_class
@@ -109,10 +109,10 @@ class InstrumentRegistry:
                         self._by_ticker[f"{provider.upper()}:{str(ticker).upper()}"] = c
 
     def find_by_isin(self, isin: str, currency: Currency | None = None) -> Instrument | None:
-        matches = self.find_candidates(SecurityCriteria(isin=isin, currency=currency))
+        matches = self.find_candidates(SecurityQuery(isin=isin, currency=currency))
         return matches[0] if matches else None
 
-    def find_candidates(self, criteria: SecurityCriteria) -> list[Instrument]:
+    def find_candidates(self, criteria: SecurityQuery) -> list[Instrument]:
         """
         Finds all instruments matching the criteria using strict field lookups.
         Returns empty list if no match.
@@ -130,7 +130,10 @@ class InstrumentRegistry:
             candidates.extend(sym_matches)
 
         # 3. Try FIGI (Strict)
-        # Note: FIGI lookup isn't explicitly in SecurityCriteria yet, but we have it in index.
+        if criteria.figi:
+            figi_match = self._by_figi.get(str(criteria.figi).upper())
+            if figi_match and figi_match not in candidates:
+                candidates.append(figi_match)
 
         # 4. Filter by Asset Class if provided
         if criteria.asset_class:
@@ -194,7 +197,7 @@ def get_registry(
 
 
 def add_instrument(
-    criteria: SecurityCriteria,
+    criteria: SecurityQuery,
     metadata: SearchResult | None,  # None if not found online
     target_path: Path,
     instrument_type: InstrumentType | None = None,
@@ -208,7 +211,7 @@ def add_instrument(
     """
     Adds a new instrument to the registry.
 
-    Uses SecurityCriteria.symbol (the raw token or security symbol).
+    Uses SecurityQuery.symbol (the raw token or security symbol).
     Extracts base ticker (before ':') for Beancount name.
     Stores provider-specific tickers only if found online.
     """
@@ -221,7 +224,7 @@ def add_instrument(
     # 1. Determine ticker
     if not criteria.symbol and not name:
         if not metadata or not metadata.symbol:
-            raise ValueError("SecurityCriteria.symbol or name is required if metadata fetch failed")
+            raise ValueError("SecurityQuery.symbol or name is required if metadata fetch failed")
         criteria.symbol = str(metadata.symbol)
 
     # 2. Extract base ticker for Beancount name
@@ -246,7 +249,7 @@ def add_instrument(
 
     # 3. Collision check against entire registry
     if registry:
-        existing = registry.find_candidates(SecurityCriteria(symbol=clean_name))
+        existing = registry.find_candidates(SecurityQuery(symbol=clean_name))
         for match in existing:
             # If name matches but ISIN is different, it's a collision
             # unless one of them is missing ISIN (like CASH).
@@ -300,9 +303,11 @@ def add_instrument(
         asset_class=asset_class,
         currency=comm_currency,
         tickers=Tickers(**tickers_dict) if tickers_dict else None,
-        validation_points=[ValidationPoint(date=criteria.target_date, price=criteria.target_price)]
-        if criteria.target_date and criteria.target_price is not None
-        else None,
+        validation_points=(
+            [ValidationPoint(date=criteria.price_on.date, price=criteria.price_on.price)]
+            if criteria.price_on
+            else None
+        ),
         country=country or (metadata.country if metadata else None),
         metadata=metadata.metadata if metadata else None,
     )

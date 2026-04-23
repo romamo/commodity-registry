@@ -16,7 +16,7 @@ from pydantic_market_data.models import (
     Currency,
     CurrencyCode,
     Price,
-    SecurityCriteria,
+    SecurityQuery,
     Symbol,
 )
 
@@ -138,7 +138,7 @@ def fetch_metadata(
     # data_provider.resolve may raise ValidationError or other source-specific errors.
     # Boundary conversion
     symbol_vo = Symbol(symbol) if not isinstance(symbol, Symbol) else symbol
-    criteria = SecurityCriteria(symbol=symbol_vo, isin=isin)
+    criteria = SecurityQuery(symbol=symbol_vo, isin=isin)
     security = data_provider.resolve(criteria)
 
     if not security:
@@ -184,9 +184,9 @@ def derive_provider_ticker(
     return None
 
 
-def search_isin(criteria: SecurityCriteria) -> list[SearchResult]:
+def search_isin(criteria: SecurityQuery) -> list[SearchResult]:
     """
-    Searches for securities across all providers using SecurityCriteria.
+    Searches for securities across all providers using SecurityQuery.
     Returns typed search results from each provider.
     """
     results = []
@@ -235,7 +235,6 @@ def search_isin(criteria: SecurityCriteria) -> list[SearchResult]:
         else:
             logger.debug(f"No results from provider {p} for {criteria.isin or criteria.symbol}")
 
-    # Fallback for Crypto: if no results found and it looks like a crypto asset class is requested
     if not results and criteria.symbol and criteria.asset_class:
         derived = derive_provider_ticker(
             str(criteria.symbol), criteria.asset_class, ProviderName.YAHOO
@@ -337,7 +336,7 @@ def resolve_currency(
 
 
 def resolve_security(
-    criteria: SecurityCriteria,
+    criteria: SecurityQuery,
     verify: bool = False,
     registry: InstrumentLookup | None = None,
     include_price: bool = False,
@@ -380,7 +379,7 @@ def resolve_security(
             price = None
             price_date = None
             if best_ticker and include_price:
-                target_date = criteria.target_date
+                target_date = criteria.price_on.date if criteria.price_on else None
                 price = fetch_price(best_ticker, provider=source, date=target_date)
                 price_date = target_date or date.today()
 
@@ -421,7 +420,7 @@ def resolve_security(
         res = results[0]
         # Fetch price (current or historical)
         if include_price:
-            target_date = criteria.target_date
+            target_date = criteria.price_on.date if criteria.price_on else None
             res.price = fetch_price(res.symbol, provider=res.provider, date=target_date)
             res.price_date = target_date or date.today()
         return res
@@ -430,7 +429,7 @@ def resolve_security(
 
 
 def resolve_and_persist(
-    criteria: SecurityCriteria,
+    criteria: SecurityQuery,
     registry: InstrumentRegistry | None = None,
     store: bool = True,
     target_path: Path | None = None,

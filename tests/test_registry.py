@@ -56,10 +56,10 @@ def test_find_by_isin(temp_registry_dir):
 
 
 def test_find_candidates_by_name(temp_registry_dir):
-    from pydantic_market_data.models import SecurityCriteria
+    from pydantic_market_data.models import SecurityQuery
 
     reg = InstrumentRegistry(extra_paths=[temp_registry_dir], include_bundled=False)
-    candidates = reg.find_candidates(SecurityCriteria(symbol="AAPL"))
+    candidates = reg.find_candidates(SecurityQuery(symbol="AAPL"))
     assert len(candidates) == 1
     assert candidates[0].name == "AAPL"
 
@@ -99,7 +99,7 @@ def test_registry_merging(temp_registry_dir):
 
 
 def test_registry_prefers_user_entries_for_name_lookups(tmp_path):
-    from pydantic_market_data.models import SecurityCriteria
+    from pydantic_market_data.models import SecurityQuery
 
     bundled_dir = tmp_path / "bundled"
     bundled_dir.mkdir()
@@ -147,7 +147,7 @@ def test_registry_prefers_user_entries_for_name_lookups(tmp_path):
     ):
         reg = InstrumentRegistry(include_bundled=True, extra_paths=[user_dir])
 
-    candidates = reg.find_candidates(SecurityCriteria(symbol="AAPL"))
+    candidates = reg.find_candidates(SecurityQuery(symbol="AAPL"))
     assert candidates[0].issuer == "User Issuer"
 
 
@@ -173,9 +173,9 @@ def test_recursive_loading(temp_registry_dir):
         yaml.dump(nested_data, f)
 
     reg = InstrumentRegistry(extra_paths=[temp_registry_dir], include_bundled=False)
-    from pydantic_market_data.models import SecurityCriteria
+    from pydantic_market_data.models import SecurityQuery
 
-    c = reg.find_candidates(SecurityCriteria(symbol="NESTED"))
+    c = reg.find_candidates(SecurityQuery(symbol="NESTED"))
     assert len(c) == 1
     assert c[0].name == "NESTED"
 
@@ -214,13 +214,13 @@ def test_duplicate_yaml_key(temp_registry_dir):
 
 
 def test_add_instrument_no_sanitization(tmp_path):
-    from pydantic_market_data.models import SecurityCriteria
+    from pydantic_market_data.models import SecurityQuery
 
     from instrument_registry.models import AssetClass, InstrumentType
     from instrument_registry.registry import add_instrument
 
     target_path = tmp_path / "manual.yaml"
-    criteria = SecurityCriteria(symbol="^GSPC", currency="USD")
+    criteria = SecurityQuery(symbol="^GSPC", currency="USD")
 
     # Should NOT add X. prefix or convert to dots
     c = add_instrument(
@@ -234,7 +234,7 @@ def test_add_instrument_no_sanitization(tmp_path):
     assert c.name == "^GSPC"
 
     # Test with provider prefix - should extract only ticker part
-    criteria_2 = SecurityCriteria(symbol="YAHOO:EURUSD=X", currency="USD")
+    criteria_2 = SecurityQuery(symbol="YAHOO:EURUSD=X", currency="USD")
     c2 = add_instrument(
         criteria=criteria_2,
         metadata=None,

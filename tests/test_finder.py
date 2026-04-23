@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from pydantic_market_data.models import Price, Security, SecurityCriteria, Symbol
+from pydantic_market_data.models import Price, Security, SecurityQuery, Symbol
 
 from instrument_registry.finder import (
     _fallback_cache_dir,
@@ -40,7 +40,7 @@ def test_search_isin_yahoo_only(mock_yahoo_source, mock_ft_source):
 
         mock_yahoo_instance.resolve.return_value = mock_security
 
-        criteria = SecurityCriteria(isin="US0378331005")
+        criteria = SecurityQuery(isin="US0378331005")
         results = search_isin(criteria)
 
         assert len(results) == 1
@@ -94,7 +94,7 @@ def test_resolve_currency():
 
 
 def test_resolve_security_registry_match():
-    from pydantic_market_data.models import SecurityCriteria
+    from pydantic_market_data.models import SecurityQuery
 
     from instrument_registry.finder import resolve_security
 
@@ -111,7 +111,7 @@ def test_resolve_security_registry_match():
 
     mock_reg.find_candidates.return_value = [mock_comm]
 
-    criteria = SecurityCriteria(symbol="GOLD")
+    criteria = SecurityQuery(symbol="GOLD")
     res = resolve_security(criteria, registry=mock_reg)
 
     assert res.name == "GOLD"

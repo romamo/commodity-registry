@@ -11,8 +11,9 @@ from pydantic_market_data.models import (
     Currency,
     CurrencyCode,
     Price,
+    PriceOnDate,
     PriceVerificationError,
-    SecurityCriteria,
+    SecurityQuery,
 )
 
 from . import common
@@ -77,12 +78,19 @@ def _resolve_criteria(
     query_label = isin or symbol or "(stdin)"
     logger.info("Resolving query: %s", query_label)
 
-    criteria = SecurityCriteria(
+    price_on = (
+        PriceOnDate(
+            price=Price(price),
+            date=pd.to_datetime(date).date(),
+        )
+        if price is not None and date
+        else None
+    )
+    criteria = SecurityQuery(
         isin=isin,
         symbol=symbol,
         currency=CurrencyCode(Currency(currency.upper())) if currency else None,
-        target_price=Price(price) if price is not None else None,
-        target_date=pd.to_datetime(date).date() if date else None,
+        price_on=price_on,
         asset_class=asset_class,
     )
 

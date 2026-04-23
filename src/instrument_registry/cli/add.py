@@ -5,7 +5,7 @@ from typing import Any
 
 import agentyper as typer
 import pandas as pd  # type: ignore[import-untyped]
-from pydantic_market_data.models import Currency, CurrencyCode, Price, SecurityCriteria
+from pydantic_market_data.models import Currency, CurrencyCode, Price, PriceOnDate, SecurityQuery
 
 from ..models import AssetClass, InstrumentType
 from . import common
@@ -107,12 +107,19 @@ def command(
         )
         name = existing_entry.name
 
-    criteria = SecurityCriteria(
+    price_on = (
+        PriceOnDate(
+            price=Price(validation_price),
+            date=pd.to_datetime(validation_date).date(),
+        )
+        if validation_price is not None and validation_date
+        else None
+    )
+    criteria = SecurityQuery(
         isin=final_isin,
         symbol=ticker,
         currency=CurrencyCode(Currency(currency.upper())) if currency else None,
-        target_price=Price(validation_price) if validation_price is not None else None,
-        target_date=pd.to_datetime(validation_date).date() if validation_date else None,
+        price_on=price_on,
     )
 
     metadata = None

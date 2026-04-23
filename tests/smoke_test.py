@@ -1,4 +1,6 @@
-from instrument_registry.registry import InstrumentRegistry, SecurityCriteria
+from pydantic_market_data.models import SecurityQuery
+
+from instrument_registry.registry import InstrumentRegistry
 
 
 def test_smoke():
@@ -7,11 +9,11 @@ def test_smoke():
     assert registry is not None
 
     # Verify search (string wrapped in Criteria)
-    res = registry.find_candidates(SecurityCriteria(symbol="AAPL"))
+    res = registry.find_candidates(SecurityQuery(symbol="AAPL"))
     assert isinstance(res, list)
 
     # Verify search (Criteria)
-    res2 = registry.find_candidates(SecurityCriteria(symbol="AAPL"))
+    res2 = registry.find_candidates(SecurityQuery(symbol="AAPL"))
     assert isinstance(res2, list)
 
     print("Smoke test passed.")

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.8] - 2026-04-23
+
+### Added
+- **`fetch --figi`**: The `fetch` command now accepts `--figi` to resolve a security by its FIGI identifier. FT Markets is the only provider that supports FIGI; the option resolves via `FTDataSource.resolve` which already prioritises FIGI over ISIN/symbol.
+- **Registry FIGI lookup**: `InstrumentRegistry.find_candidates` now queries the `_by_figi` index when `SecurityQuery.figi` is set. The index was already built at load time but never queried.
+
+### Changed
+- **`SecurityCriteria` → `SecurityQuery`**: Migrated to the renamed model introduced in `pydantic-market-data` 0.3.0. All internal APIs, Protocol definitions, CLI commands, and tests updated.
+- **`price_on` field**: Replaced the flat `target_date` / `target_price` fields (removed in `pydantic-market-data` 0.3.0) with the combined `price_on: PriceOnDate` model throughout the CLI and finder.
+
+### Dependencies
+- `pydantic-market-data` bumped to `>=0.3.0`
+- `agentyper` pin relaxed from `==0.1.12` to `>=0.1.12`
+- `py-yfinance` bumped to `>=0.1.15`
+- `py-ftmarkets` bumped to `>=0.4.0`
+
 ## [0.2.7] - 2026-04-23
 
 ### Added

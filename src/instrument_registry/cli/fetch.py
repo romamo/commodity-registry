@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 import agentyper as typer
-from pydantic_market_data.models import SecurityCriteria
+from pydantic_market_data.models import SecurityQuery
 
 from . import common
 
@@ -18,6 +18,11 @@ def command(
         None,
         "--isin",
         help="Fetch using an ISIN",
+    ),  # noqa: B008
+    figi: str | None = typer.Option(
+        None,
+        "--figi",
+        help="Fetch using a FIGI (FT Markets only)",
     ),  # noqa: B008
     symbol: str | None = typer.Option(
         None,
@@ -35,13 +40,14 @@ def command(
         no_bundled=no_bundled,
     )
 
-    common.require_live_providers("instrument-reg fetch", provider="yahoo")
-    logger.info("Fetching details for ISIN=%s, Ticker=%s", isin, symbol)
-    criteria = SecurityCriteria(isin=isin, symbol=symbol)
+    provider_hint = "ft" if figi and not isin and not symbol else "yahoo"
+    common.require_live_providers("instrument-reg fetch", provider=provider_hint)
+    logger.info("Fetching details for ISIN=%s, FIGI=%s, Ticker=%s", isin, figi, symbol)
+    criteria = SecurityQuery(isin=isin, figi=figi, symbol=symbol)
     try:
         res = resolve_security(criteria, verify=True, registry=common.registry())
     except ImportError:
-        common.exit_missing_provider(provider="yahoo")
+        common.exit_missing_provider(provider=provider_hint)
 
     if not res:
         logger.warning("No results found.")
