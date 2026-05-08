@@ -42,8 +42,9 @@ def test_resolve_and_persist_new_discovery(
     # Execute
     result = resolve_and_persist(criteria, registry=mock_registry, store=True)
 
-    # Verify
-    assert result == res
+    # Verify — returns (SearchResult, Instrument | None)
+    assert result is not None
+    assert result[0] == res
     mock_add.assert_called_once()
     args, kwargs = mock_add.call_args
     assert kwargs["criteria"] == criteria
@@ -69,6 +70,8 @@ def test_resolve_and_persist_existing(mock_add, mock_resolve, mock_registry):
     with patch.object(mock_registry, "find_candidates", return_value=[MagicMock()]):
         result = resolve_and_persist(criteria, registry=mock_registry, store=True)
 
-        assert result == res
+        # Returns (SearchResult, None) — None because it was found in registry (no new instrument)
+        assert result is not None
+        assert result[0] == res
         # Should NOT add because it was found in registry
         mock_add.assert_not_called()

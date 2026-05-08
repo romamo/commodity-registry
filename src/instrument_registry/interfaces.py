@@ -65,4 +65,7 @@ class SearchResult(BaseModel):
     price: Price.Input | None = None
     price_date: date | None = None
     country: str | None = None
+    isin: str | None = None
+    figi: str | None = None
+    ticker: str | None = None
     metadata: dict[str, Any] | None = None

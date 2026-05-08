@@ -11,8 +11,11 @@ def test_cli_resolve_success(mock_resolve, capsys):
 
     from instrument_registry.interfaces import ProviderName, SearchResult
 
-    mock_resolve.return_value = SearchResult(
-        provider=ProviderName.YAHOO, symbol="AAPL", name="Apple Inc.", currency=Currency("USD")
+    mock_resolve.return_value = (
+        SearchResult(
+            provider=ProviderName.YAHOO, symbol="AAPL", name="Apple Inc.", currency=Currency("USD")
+        ),
+        None,
     )
 
     try:
@@ -39,8 +42,11 @@ def test_cli_resolve_single_json_pipe(mock_resolve, capsys):
 
     from instrument_registry.interfaces import ProviderName, SearchResult
 
-    mock_resolve.return_value = SearchResult(
-        provider=ProviderName.YAHOO, symbol="AAPL", name="Apple Inc.", currency=Currency("USD")
+    mock_resolve.return_value = (
+        SearchResult(
+            provider=ProviderName.YAHOO, symbol="AAPL", name="Apple Inc.", currency=Currency("USD")
+        ),
+        None,
     )
 
     with (
@@ -60,14 +66,23 @@ def test_cli_resolve_jsonl_pipe_multiple_records(mock_resolve, capsys):
     from instrument_registry.interfaces import ProviderName, SearchResult
 
     mock_resolve.side_effect = [
-        SearchResult(
-            provider=ProviderName.YAHOO, symbol="AAPL", name="Apple Inc.", currency=Currency("USD")
+        (
+            SearchResult(
+                provider=ProviderName.YAHOO,
+                symbol="AAPL",
+                name="Apple Inc.",
+                currency=Currency("USD"),
+            ),
+            None,
         ),
-        SearchResult(
-            provider=ProviderName.YAHOO,
-            symbol="CSPX",
-            name="iShares Core S&P 500",
-            currency=Currency("USD"),
+        (
+            SearchResult(
+                provider=ProviderName.YAHOO,
+                symbol="CSPX",
+                name="iShares Core S&P 500",
+                currency=Currency("USD"),
+            ),
+            None,
         ),
     ]
 
@@ -90,8 +105,11 @@ def test_cli_resolve_jsonl_pipe_skips_blank_lines(mock_resolve, capsys):
 
     from instrument_registry.interfaces import ProviderName, SearchResult
 
-    mock_resolve.return_value = SearchResult(
-        provider=ProviderName.YAHOO, symbol="AAPL", name="Apple Inc.", currency=Currency("USD")
+    mock_resolve.return_value = (
+        SearchResult(
+            provider=ProviderName.YAHOO, symbol="AAPL", name="Apple Inc.", currency=Currency("USD")
+        ),
+        None,
     )
 
     jsonl = '\n{"isin": "US0378331005"}\n\n'

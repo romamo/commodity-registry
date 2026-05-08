@@ -467,8 +467,11 @@ def test_cli_fetch_with_price(mock_resolve, mock_price, mock_get_available_provi
 @patch("instrument_registry.finder.resolve_and_persist")
 def test_cli_resolve_json(mock_resolve, mock_registry, capsys):
     """Test resolve command with JSON output."""
-    mock_resolve.return_value = SearchResult(
-        provider=ProviderName.YAHOO, symbol="AAPL", name="Apple Inc.", currency=Currency("USD")
+    mock_resolve.return_value = (
+        SearchResult(
+            provider=ProviderName.YAHOO, symbol="AAPL", name="Apple Inc.", currency=Currency("USD")
+        ),
+        None,
     )
 
     args = ["instrument-reg", "resolve", "--format", "json", "AAPL"]

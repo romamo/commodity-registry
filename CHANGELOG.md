@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.9] - 2026-05-08
+
+### Added
+- **`resolve --figi`**: The `resolve` command now accepts `--figi` to look up a security by its FIGI identifier via OpenFIGI. Passed through JSONL pipe records as well.
+- **`resolve --report-price`**: Made `--report-price` a proper named CLI flag (was a bare `bool` default).
+- **`resolve --no-save`**: Renamed `--dry-run` to `--no-save` for clearer intent.
+- **OpenFIGI resolution in finder**: New `_resolve_via_openfigi` function resolves ISIN/FIGI to ticker with FIGI → ISIN priority fallback.
+- **`resolve` structured output priority**: Registry hits now emit the registry `Instrument` record; new discoveries emit the newly persisted `Instrument`. Falls back to `SearchResult` when no instrument is available.
+- **`registry.reload()`**: New method on `InstrumentRegistry` to load additional data from a path and rebuild indices without recreating the instance.
+- **ETP type mapping**: `"ETP"` asset class now correctly maps to `InstrumentType.ETF`.
+- **`_infer_types` `security_type` parameter**: Type inference now accepts an optional `security_type` (more specific than `asset_class`) for better classification from OpenFIGI metadata.
+
+### Changed
+- **Registry `find_candidates` lookup order**: FIGI (globally unique, short-circuit) → ISIN+currency filter → symbol/name (only when no strict identifier). Currency filter now applied at ISIN and symbol stages.
+- **JSONL pipe `price_on` passthrough**: `price_on` object in piped JSONL records is now parsed and forwarded to the resolver.
+
+### Removed
+- **Bundled data files**: Removed `data/instruments/manual.yaml`, `currencies.yaml`, and `etfs.yaml` from source tree (data is managed externally).
+
+### Dependencies
+- `pydantic-market-data` bumped to `>=0.3.2`
+- `py-yfinance` bumped to `>=0.1.16`
+- `py-ftmarkets` bumped to `>=0.5.0`
+
 ## [0.2.8] - 2026-04-23
 
 ### Added

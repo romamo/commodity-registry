@@ -64,10 +64,12 @@ def _resolve_criteria(
     ctx: typer.Context,
     isin: str | None,
     symbol: str | None,
+    figi: str | None,
     currency: str | None,
     asset_class: str | None,
     price: float | None,
     date: str | None,
+    price_on: PriceOnDate | None = None,
     dry_run: bool,
     report_price: bool,
     reg: Any,
@@ -75,26 +77,25 @@ def _resolve_criteria(
 ) -> None:
     from ..finder import get_available_providers, resolve_and_persist, verify_ticker
 
-    query_label = isin or symbol or "(stdin)"
+    query_label = isin or figi or symbol or "(stdin)"
     logger.info("Resolving query: %s", query_label)
 
-    price_on = (
-        PriceOnDate(
+    if price is not None and date:
+        price_on = PriceOnDate(
             price=Price(price),
             date=pd.to_datetime(date).date(),
         )
-        if price is not None and date
-        else None
-    )
+
     criteria = SecurityQuery(
         isin=isin,
         symbol=symbol,
+        figi=figi,
         currency=CurrencyCode(Currency(currency.upper())) if currency else None,
         price_on=price_on,
         asset_class=asset_class,
     )
 
-    res = resolve_and_persist(
+    result = resolve_and_persist(
         criteria,
         registry=reg,
         store=True,
@@ -103,7 +104,7 @@ def _resolve_criteria(
         include_price=report_price,
     )
 
-    if not res:
+    if not result:
         providers = get_available_providers()
         if not providers:
             common.exit_with_error(
@@ -111,9 +112,11 @@ def _resolve_criteria(
                 "'instrument-registry[providers]'"
             )
         common.exit_with_error(f"Could not resolve '{query_label}'")
-    assert res is not None
+    assert result is not None
 
-    if date and price is not None:
+    res, new_instrument = result
+
+    if date and price is not None and new_instrument is not None:
         logger.info("Verifying price %s on %s...", price, date)
         v_date = pd.to_datetime(date).date()
         try:
@@ -127,6 +130,13 @@ def _resolve_criteria(
         except PriceVerificationError as exc:
             common.exit_with_error(f"  [!] FAILED: {exc}")
 
+    if new_instrument is None:
+        _candidates = reg.find_candidates(criteria)
+        if _candidates and common.emit_structured(_candidates[0]):
+            return
+    else:
+        if common.emit_structured(new_instrument):
+            return
     if common.emit_structured(res):
         return
 
@@ -151,6 +161,11 @@ def command(
         "--provider",
         help="Preferred provider name for external resolution",
     ),  # noqa: B008
+    figi: str | None = typer.Option(
+        None,
+        "--figi",
+        help="FIGI identifier for direct security lookup via OpenFIGI",
+    ),  # noqa: B008
     currency: str | None = typer.Option(
         None,
         "--currency",
@@ -166,13 +181,23 @@ def command(
         "--price",
         help="Historical price used with --date verification",
     ),  # noqa: B008
-    report_price: bool = False,
+    report_price: bool = typer.Option(  # noqa: B008
+        False,
+        "--report-price",
+        is_flag=True,
+        help="Fetch and include the current price (or historical price if --date is given)",
+    ),
     asset_class: str | None = typer.Option(
         None,
         "--asset-class",
         help="Restrict matches to this asset class",
     ),  # noqa: B008
-    dry_run: bool = False,
+    no_save: bool = typer.Option(  # noqa: B008
+        False,
+        "--no-save",
+        is_flag=True,
+        help="Resolve and return output without writing to registry file",
+    ),
 ) -> None:
     """Resolve a query from local registries first, then external providers."""
     del provider  # Provider filtering is not implemented yet.
@@ -215,11 +240,12 @@ def command(
             ctx=ctx,
             isin=isin,
             symbol=symbol,
+            figi=figi,
             currency=currency,
             asset_class=asset_class,
             price=price,
             date=date,
-            dry_run=dry_run,
+            dry_run=no_save,
             report_price=report_price,
             reg=reg,
             target_path=target_path,
@@ -247,15 +273,24 @@ def command(
                     else None
                 )
             )
+            raw_price_on = pipe_data.get("price_on") if rec_price is None else None
+            pipe_price_on: PriceOnDate | None = None
+            if raw_price_on and raw_price_on.get("price") is not None and raw_price_on.get("date"):
+                pipe_price_on = PriceOnDate(
+                    price=Price(float(raw_price_on["price"])),
+                    date=pd.to_datetime(str(raw_price_on["date"])).date(),
+                )
             _resolve_criteria(
                 ctx=ctx,
                 isin=pipe_data.get("isin"),
                 symbol=pipe_data.get("symbol"),
+                figi=figi or pipe_data.get("figi"),
                 currency=currency or pipe_data.get("currency"),
                 asset_class=asset_class or pipe_data.get("asset_class"),
                 price=rec_price,
                 date=rec_date,
-                dry_run=dry_run,
+                price_on=pipe_price_on,
+                dry_run=no_save,
                 report_price=report_price,
                 reg=reg,
                 target_path=target_path,

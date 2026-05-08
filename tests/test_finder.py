@@ -32,8 +32,11 @@ def test_search_isin_yahoo_only(mock_yahoo_source, mock_ft_source):
     mock_yahoo_instance = MagicMock()
     mock_yahoo_source.return_value = mock_yahoo_instance
 
-    # Simulate FT not installed by making it None in the finder module
-    with patch("instrument_registry.finder.FTDataSource", None):
+    # Simulate FT and OpenFIGI not installed by making them None in the finder module
+    with (
+        patch("instrument_registry.finder.FTDataSource", None),
+        patch("instrument_registry.finder.OpenFIGIDataSource", None),
+    ):
         mock_security = Security(
             symbol=Symbol(root="AAPL"), name="Apple Inc.", currency="USD", exchange="NASDAQ"
         )
@@ -107,6 +110,8 @@ def test_resolve_security_registry_match():
     mock_comm.asset_class = "Commodity"
     mock_comm.instrument_type = "Future"
     mock_comm.country = None
+    mock_comm.isin = None
+    mock_comm.figi = None
     mock_comm.metadata = None
 
     mock_reg.find_candidates.return_value = [mock_comm]

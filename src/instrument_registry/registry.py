@@ -6,7 +6,7 @@ from typing import Any
 import yaml
 from pydantic_market_data.models import Currency, SecurityQuery, Symbol
 
-from .interfaces import SearchResult
+from .interfaces import ProviderName, SearchResult
 from .models import AssetClass, Instrument, InstrumentFile, InstrumentType, _map_asset_class
 from .resources import get_instrument_files
 
@@ -51,6 +51,11 @@ class InstrumentRegistry:
         logger.debug("Loading bundled registry data...")
         for file_path in get_instrument_files():
             self._load_file(file_path)
+
+    def reload(self, path: Path) -> None:
+        """Load additional instrument data from path and rebuild lookup indices."""
+        self.load_path(path)
+        self._rebuild_indices()
 
     def load_path(self, path: Path):
         """Loads instrument data from a specific file or directory recursively."""
@@ -114,56 +119,54 @@ class InstrumentRegistry:
 
     def find_candidates(self, criteria: SecurityQuery) -> list[Instrument]:
         """
-        Finds all instruments matching the criteria using strict field lookups.
-        Returns empty list if no match.
+        Match priority: FIGI (unique) → ISIN+currency → symbol (fallback only).
+
+        A candidate must satisfy one of:
+        - FIGI exact match (globally unique, returned immediately)
+        - ISIN match AND currency match (when currency is provided)
+        - ISIN match alone (when currency is not provided)
+        - symbol/name match (only when neither ISIN nor FIGI is present)
         """
-        candidates = []
-
-        # 1. Try ISIN (Strict)
-        if criteria.isin:
-            candidates.extend(self._by_isin.get(str(criteria.isin).upper(), []))
-
-        # 2. Try Name/Symbol (Strict)
-        if criteria.symbol:
-            sym_upper = str(criteria.symbol).upper()
-            sym_matches = self._by_name.get(sym_upper, [])
-            candidates.extend(sym_matches)
-
-        # 3. Try FIGI (Strict)
+        # 1. FIGI — globally unique; short-circuit everything else
         if criteria.figi:
             figi_match = self._by_figi.get(str(criteria.figi).upper())
-            if figi_match and figi_match not in candidates:
-                candidates.append(figi_match)
+            if figi_match:
+                return [figi_match]
 
-        # 4. Filter by Asset Class if provided
-        if criteria.asset_class:
+        candidates: list[Instrument] = []
+
+        # 2. ISIN + optional currency filter
+        if criteria.isin:
+            isin_matches = self._by_isin.get(str(criteria.isin).upper(), [])
+            if criteria.currency:
+                curr = str(criteria.currency).upper()
+                isin_matches = [c for c in isin_matches if str(c.currency).upper() == curr]
+            candidates.extend(isin_matches)
+
+        # 3. Symbol/name — only when no strict identifier (ISIN/FIGI) was provided
+        elif criteria.symbol:
+            sym_matches = self._by_name.get(str(criteria.symbol).upper(), [])
+            if criteria.currency:
+                curr = str(criteria.currency).upper()
+                sym_matches = [c for c in sym_matches if str(c.currency).upper() == curr]
+            candidates.extend(sym_matches)
+
+        # 4. Asset-class filter
+        if criteria.asset_class and candidates:
             target_ac = _map_asset_class(criteria.asset_class)
             if not target_ac:
-                # If an asset class was requested but is unrecognizable,
-                # we must fail the registry lookup to prevent incorrect matches.
                 return []
-
             candidates = [c for c in candidates if _map_asset_class(c.asset_class) == target_ac]
 
-        # Deduplicate (by name + asset_class to allow multiple types of same symbol)
-        seen = set()
-        unique_candidates = []
+        # Deduplicate by (name, asset_class)
+        seen: set[tuple[str, object]] = set()
+        unique: list[Instrument] = []
         for c in candidates:
-            # Note: We use name+asset_class as unique key in this context
-            # to allow TRX(Stock) and TRX(Crypto) to both be returned if needed.
             key = (c.name.upper(), c.asset_class)
             if key not in seen:
-                unique_candidates.append(c)
+                unique.append(c)
                 seen.add(key)
-
-        # 5. Filter by Currency if provided
-        if criteria.currency:
-            curr_str = str(criteria.currency)
-            unique_candidates = [
-                c for c in unique_candidates if str(c.currency).upper() == curr_str.upper()
-            ]
-
-        return unique_candidates
+        return unique
 
     def find_by_ticker(self, provider: str, symbol: Symbol | str) -> Instrument | None:
         """
@@ -227,15 +230,18 @@ def add_instrument(
             raise ValueError("SecurityQuery.symbol or name is required if metadata fetch failed")
         criteria.symbol = str(metadata.symbol)
 
-    # 2. Extract base ticker for Beancount name
-    # Example: "ALUM.L" -> "ALUM", "4GLD:GER:EUR" -> "4GLD"
+    # 2. Extract base ticker for instrument name
     if name:
         clean_name = name
     else:
-        # Prefer online metadata ticker if available, otherwise fallback to criteria.symbol
-        token = str(metadata.symbol) if metadata and metadata.symbol else str(criteria.symbol or "")
+        # Prefer the raw provider ticker (e.g. OpenFIGI's "CHIP" over Yahoo's "CHIP.PA")
+        if metadata and metadata.ticker:
+            token = str(metadata.ticker)
+        elif metadata and metadata.symbol:
+            token = str(metadata.symbol)
+        else:
+            token = str(criteria.symbol or "")
         if not token:
-            # Should not happen given check in step 1, but for mypy
             raise ValueError("Could not determine ticker for name generation")
 
         # For CASH instruments, prefer use the name (e.g. "EUR") if it is a 3-letter code.
@@ -243,8 +249,6 @@ def add_instrument(
         if is_fx and metadata and metadata.name and len(str(metadata.name)) == 3:
             clean_name = str(metadata.name)
         else:
-            # Simple extraction: "ALUM.L" -> "ALUM", "^GSPC" -> "^GSPC"
-            # But let's be careful with providers. If it's "YAHOO:^GSPC", we want "^GSPC".
             clean_name = token.split(":")[-1]
 
     # 3. Collision check against entire registry
@@ -272,7 +276,7 @@ def add_instrument(
             parts = symbol_str.split(":", 1)
             tickers_dict = {parts[0].lower(): parts[1]}
         else:
-            tickers_dict = {"yahoo": symbol_str}
+            tickers_dict = {ProviderName.YAHOO.value: symbol_str}
 
     if ibkr:
         if not tickers_dict:
@@ -298,7 +302,7 @@ def add_instrument(
     instrument = Instrument(
         name=clean_name,
         isin=criteria.isin,
-        figi=None,
+        figi=metadata.figi if metadata else None,
         instrument_type=instrument_type,
         asset_class=asset_class,
         currency=comm_currency,
