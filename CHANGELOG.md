@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.10] - 2026-05-08
+
+### Added
+- **Synthetic CASH result for same-currency pair**: `resolve_currency("EUR", target_currency=Currency("EUR"))` now returns a synthetic `SearchResult` with `asset_class=CASH` and `instrument_type=CASH` instead of `None`, enabling callers to treat same-currency no-ops uniformly.
+
+### Changed
+- **`SearchResult.provider` is now optional**: `provider: ProviderName | None = None` — allows results built without a known provider (e.g. synthetic CASH) to be constructed without a dummy value.
+- **Provider display in `resolve` output**: Provider label is only printed when a provider is present, preventing a crash on provider-less results.
+- **`fetch_price` provider fallback**: `resolve_security` now falls back to `ProviderName.YAHOO` when `res.provider` is `None`, avoiding a type error on price fetch.
+
 ## [0.2.9] - 2026-05-08
 
 ### Added

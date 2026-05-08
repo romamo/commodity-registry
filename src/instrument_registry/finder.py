@@ -480,7 +480,13 @@ def resolve_currency(
         return None
 
     if base == quote_str:
-        return None
+        return SearchResult(
+            symbol=Symbol(root=base),
+            name=base,
+            currency=CurrencyCode(Currency(base)),
+            asset_class=AssetClass.CASH,
+            instrument_type=InstrumentType.CASH,
+        )
 
     # 1. Target is USD (e.g. EUR in USD -> EURUSD=X)
     if quote_str == "USD":
@@ -499,8 +505,6 @@ def resolve_currency(
         # Avoid circular import if fetch_metadata moved, but here they are in same file
         if not fetch_metadata(ticker, provider=ProviderName.YAHOO):
             return None
-
-    from .models import AssetClass, InstrumentType
 
     return SearchResult(
         provider=ProviderName.YAHOO,
@@ -594,7 +598,9 @@ def resolve_security(
                 if include_price:
                     target_date = criteria.price_on.date if criteria.price_on else None
                     fx_res.price = fetch_price(
-                        fx_res.symbol, provider=fx_res.provider, date=target_date
+                        fx_res.symbol,
+                        provider=fx_res.provider or ProviderName.YAHOO,
+                        date=target_date,
                     )
                     fx_res.price_date = target_date or date.today()
                 return fx_res
@@ -606,7 +612,9 @@ def resolve_security(
         # Fetch price (current or historical)
         if include_price:
             target_date = criteria.price_on.date if criteria.price_on else None
-            res.price = fetch_price(res.symbol, provider=res.provider, date=target_date)
+            res.price = fetch_price(
+                res.symbol, provider=res.provider or ProviderName.YAHOO, date=target_date
+            )
             res.price_date = target_date or date.today()
         return res
 

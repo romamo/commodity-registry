@@ -56,7 +56,7 @@ class InstrumentLookup(Protocol):
 class SearchResult(BaseModel):
     """Result from multi-provider search"""
 
-    provider: ProviderName
+    provider: ProviderName | None = None
     symbol: Symbol.Input
     name: str
     currency: CurrencyCode.Input | None = None

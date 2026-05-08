@@ -145,9 +145,9 @@ def _resolve_criteria(
     price_str = f" [{p_label}: {p_val:.2f} {res.currency}]" if res.price else ""
     country_str = f" | Country: {res.country}" if res.country else ""
     meta_str = f" | Meta: {res.metadata}" if res.metadata else ""
+    provider_str = f" ({res.provider.value})" if res.provider else ""
     print(
-        f"Resolved: {res.name} -> {str(res.symbol)} ({res.provider.value})"
-        f"{price_str}{country_str}{meta_str}"
+        f"Resolved: {res.name} -> {str(res.symbol)}{provider_str}{price_str}{country_str}{meta_str}"
     )
 
 

@@ -93,12 +93,17 @@ class TestResolveCurrency:
         res = resolve_currency("EUR-USD")
         assert res.symbol.root == "EURUSD=X"
 
-    def test_same_currency_returns_none(self):
-        """EUR vs EUR is not a valid pair."""
+    def test_same_currency_returns_synthetic_cash(self):
+        """Same base/quote returns a synthetic no-op CASH instrument."""
         from pydantic_market_data.models import Currency
 
+        from instrument_registry.models import AssetClass, InstrumentType
+
         res = resolve_currency("EUR", target_currency=Currency("EUR"))
-        assert res is None
+        assert res is not None
+        assert str(res.symbol) == "EUR"
+        assert res.asset_class == AssetClass.CASH
+        assert res.instrument_type == InstrumentType.CASH
 
     def test_empty_symbol_returns_none(self):
         assert resolve_currency("") is None
