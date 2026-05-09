@@ -103,7 +103,8 @@ def test_resolve_security_registry_match():
 
     mock_reg = MagicMock()
     mock_comm = MagicMock()
-    mock_comm.name = "GOLD"
+    mock_comm.symbol = "GOLD"
+    mock_comm.name = None
     mock_comm.currency = "USD"
     mock_comm.tickers = MagicMock()
     mock_comm.tickers.yahoo = "GC=F"

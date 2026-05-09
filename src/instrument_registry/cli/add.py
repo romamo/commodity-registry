@@ -18,10 +18,10 @@ def command(
     query: str | None = typer.Argument(None, help="Instrument query or identifier"),  # noqa: B008
     registry_path: str | None = common.REGISTRY_PATH_OPTION,
     no_bundled: bool = common.NO_BUNDLED_OPTION,
-    name: str | None = typer.Option(
+    canonical: str | None = typer.Option(
         None,
-        "--name",
-        help="Canonical instrument name to store",
+        "--canonical",
+        help="Canonical instrument symbol to store (overrides auto-derived symbol)",
     ),  # noqa: B008
     isin: str | None = typer.Option(None, "--isin", help="ISIN code"),  # noqa: B008
     symbol: str | None = typer.Option(
@@ -98,14 +98,14 @@ def command(
 
     reg = common.registry()
     existing_entry = reg.find_by_isin(final_isin, currency) if (final_isin and currency) else None
-    if existing_entry and not name:
+    if existing_entry and not canonical:
         logger.info(
-            "Using existing name '%s' for instrument %s/%s",
-            existing_entry.name,
+            "Preserving existing symbol '%s' for instrument %s/%s",
+            existing_entry.symbol,
             final_isin,
             currency,
         )
-        name = existing_entry.name
+        canonical = existing_entry.symbol
 
     price_on = (
         PriceOnDate(
@@ -136,7 +136,7 @@ def command(
             logger.info(
                 "Found candidate: %s (%s) - %s",
                 metadata_symbol,
-                metadata.provider.value,
+                metadata.provider.value if metadata.provider else "unknown",
                 metadata.name,
             )
             if not criteria.symbol:
@@ -173,7 +173,7 @@ def command(
             target_path=target_path,
             instrument_type=InstrumentType(instrument_type) if instrument_type else None,
             asset_class=AssetClass(asset_class) if asset_class else None,
-            name=name,
+            symbol=canonical,
             dry_run=dry_run,
             registry=reg,
             country=country,
@@ -181,6 +181,6 @@ def command(
         )
         if common.emit_structured(instrument):
             return
-        print(f"Successfully processed {instrument.name}")
+        print(f"Successfully processed {instrument.symbol}")
     except ValueError as exc:
         common.exit_with_error(str(exc))

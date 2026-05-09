@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.11] - 2026-05-09
+
+### Changed
+- **`Instrument.name` renamed to `Instrument.symbol`**: The canonical identifier field is now `symbol`; `name` is a new optional field for display names. All internal registry indices updated accordingly (`_by_symbol`, deduplication key).
+- **Asset class mapping expanded**: `_ASSET_CLASS_MAP` is now a module-level constant (no lazy init) and adds `FIXED_INCOME → FixedIncomeETF`, `INDEX → Stock`, `COMMODITY → Commodity`, and `FX → Cash` mappings.
+- **`resolve` asset-class coercion**: New `_coerce_asset_class` helper maps local registry asset-class strings (e.g. `"stock"`, `"equityetf"`) to `pmdp.AssetClass` values for provider queries.
+- **`price_on` list support**: Pipe-mode `price_on` field now accepts both a single dict and a list (compatibility with pmdp ≥ 0.4.1 which emits a list).
+- **`resolve` symbol fallback**: When building a `SearchResult` from a registry component, falls back to `res_comp.symbol` (not `res_comp.name`) and uses `res_comp.name or res_comp.symbol` for display.
+
+### Dependencies
+- `pydantic-market-data` bumped to `>=0.4.0`
+
 ## [0.2.10] - 2026-05-08
 
 ### Added

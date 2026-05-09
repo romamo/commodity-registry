@@ -92,7 +92,7 @@ def test_cli_registry_path_after_subcommand_reaches_write_target(mock_log, mock_
     mock_get_reg.return_value = mock_reg
 
     with patch("instrument_registry.registry.add_instrument") as mock_add:
-        mock_add.return_value = type("InstrumentResult", (), {"name": "AAPL"})()
+        mock_add.return_value = type("InstrumentResult", (), {"symbol": "AAPL"})()
         main(
             [
                 "add",
@@ -135,7 +135,7 @@ def test_cli_lint_basic(mock_log, mock_get_reg, capsys):
 @patch("instrument_registry.cli.common.setup_logging")
 def test_cli_lint_verbose_summary(mock_log, mock_get_reg, capsys):
     mock_instrument = MagicMock()
-    mock_instrument.name = "AAPL"
+    mock_instrument.symbol = "AAPL"
     mock_instrument.isin = "US0378331005"
     mock_instrument.currency = "USD"
 
@@ -154,11 +154,11 @@ def test_cli_lint_verbose_summary(mock_log, mock_get_reg, capsys):
 @patch("instrument_registry.cli.common.setup_logging")
 def test_cli_lint_debug_lists_each_symbol(mock_log, mock_get_reg, capsys):
     first = MagicMock()
-    first.name = "AAPL"
+    first.symbol = "AAPL"
     first.isin = "US0378331005"
     first.currency = "USD"
     second = MagicMock()
-    second.name = "CSPX"
+    second.symbol = "CSPX"
     second.isin = "IE00B5BMR087"
     second.currency = "USD"
 
@@ -178,7 +178,7 @@ def test_cli_lint_debug_lists_each_symbol(mock_log, mock_get_reg, capsys):
 @patch("instrument_registry.cli.common.setup_logging")
 def test_cli_lint_json_output(mock_log, mock_get_reg, capsys):
     mock_instrument = MagicMock()
-    mock_instrument.name = "AAPL"
+    mock_instrument.symbol = "AAPL"
     mock_instrument.isin = "US0378331005"
     mock_instrument.currency = "USD"
 
@@ -199,11 +199,11 @@ def test_cli_lint_json_output(mock_log, mock_get_reg, capsys):
 @patch("instrument_registry.cli.common.setup_logging")
 def test_cli_lint_debug_json_streams_events(mock_log, mock_get_reg, capsys):
     first = MagicMock()
-    first.name = "AAPL"
+    first.symbol = "AAPL"
     first.isin = "US0378331005"
     first.currency = "USD"
     second = MagicMock()
-    second.name = "CSPX"
+    second.symbol = "CSPX"
     second.isin = "IE00B5BMR087"
     second.currency = "USD"
 
@@ -215,8 +215,8 @@ def test_cli_lint_debug_json_streams_events(mock_log, mock_get_reg, capsys):
     main(["-vv", "lint", "--format", "json"])
 
     captured = capsys.readouterr()
-    assert '{"event": "instrument_checked", "name": "AAPL", "status": "OK"}' in captured.out
-    assert '{"event": "instrument_checked", "name": "CSPX", "status": "OK"}' in captured.out
+    assert '{"event": "instrument_checked", "symbol": "AAPL", "status": "OK"}' in captured.out
+    assert '{"event": "instrument_checked", "symbol": "CSPX", "status": "OK"}' in captured.out
     assert '"instrument_count": 2' in captured.out
 
 
@@ -230,7 +230,7 @@ def test_cli_add_success(mock_add, mock_search, mock_registry, capsys):
     ]
 
     mock_comm = MagicMock()
-    mock_comm.name = "AAPL"
+    mock_comm.symbol = "AAPL"
     mock_add.return_value = mock_comm
 
     args = [
@@ -333,7 +333,7 @@ def test_cli_add_requires_explicit_write_target(capsys, monkeypatch):
 def test_cli_add_uses_env_write_target(mock_add, mock_search, mock_registry, monkeypatch, capsys):
     mock_search.return_value = []
     mock_comm = MagicMock()
-    mock_comm.name = "AAPL"
+    mock_comm.symbol = "AAPL"
     mock_add.return_value = mock_comm
     monkeypatch.setenv("INSTRUMENT_REGISTRY_PATH", str(mock_registry))
 
@@ -386,7 +386,7 @@ def test_cli_lint_with_verify(
     # Create a small registry with ticker and validation points
     reg_file = mock_registry / "manual.yaml"
     comm = Instrument(
-        name="AAPL",
+        symbol="AAPL",
         isin="US0378331005",
         instrument_type=InstrumentType.STOCK,
         asset_class=AssetClass.STOCK,
@@ -430,7 +430,7 @@ def test_cli_lint_verify_requires_providers(mock_get_available_providers, mock_r
     reg_file = mock_registry / "manual.yaml"
     reg_file.write_text(
         "instruments:\n"
-        "  - name: AAPL\n"
+        "  - symbol: AAPL\n"
         "    isin: US0378331005\n"
         "    instrument_type: Stock\n"
         "    asset_class: Stock\n"

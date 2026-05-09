@@ -7,12 +7,16 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name", "instrument_type", "asset_class", "currency"],
+        "required": ["symbol", "instrument_type", "asset_class", "currency"],
         "properties": {
-          "name": {
+          "symbol": {
             "type": "string",
             "pattern": "^[A-Z][A-Z0-9\\\\._-]*$",
-            "description": "Canonical Beancount instrument name"
+            "description": "Canonical Beancount instrument symbol"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable instrument name (e.g. Microsoft Corporation)"
           },
           "isin": { "type": "string", "pattern": "^[A-Z]{2}[A-Z0-9]{9}\\d$" },
           "figi": { "type": "string" },

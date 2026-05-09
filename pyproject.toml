@@ -30,7 +30,7 @@ classifiers = [
 dependencies = [
     "pydantic==2.13.4",
     "pyyaml>=6.0",
-    "pydantic-market-data>=0.3.2",
+    "pydantic-market-data>=0.4.0",
     "diskcache>=5.6.3",
     "platformdirs>=4.9.2",
     "agentyper>=0.1.12",

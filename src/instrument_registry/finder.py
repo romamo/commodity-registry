@@ -178,10 +178,10 @@ def fetch_metadata(
 
 @cache.memoize(expire=86400)
 def derive_provider_ticker(
-    name: str, asset_class: AssetClass | str | None, provider: ProviderName | str
+    symbol: str, asset_class: AssetClass | str | None, provider: ProviderName | str
 ) -> str | None:
     """
-    Derives a provider-specific ticker based on an instrument's name and asset class.
+    Derives a provider-specific ticker based on an instrument's symbol and asset class.
     Used when an explicit ticker is missing from the registry.
     """
     # Normalize provider name
@@ -190,8 +190,8 @@ def derive_provider_ticker(
     if p_name == ProviderName.YAHOO.value:
         # Yahoo Crypto Pattern: {TOKEN}-USD
         ac = str(asset_class).upper() if asset_class else ""
-        if ("CRYPTO" in ac) and "-" not in name:
-            return f"{name}-USD"
+        if ("CRYPTO" in ac) and "-" not in symbol:
+            return f"{symbol}-USD"
 
     return None
 
@@ -329,7 +329,7 @@ def search_isin(criteria: SecurityQuery) -> list[SearchResult]:
         openfigi_result = _resolve_via_openfigi(criteria)
         if openfigi_result:
             ticker_str = str(openfigi_result.symbol)
-            price_on = criteria.price_on
+            price_on = criteria.price_on[0] if criteria.price_on else None
             logger.debug(
                 "Provider lookup: ticker=%s isin=%s currency=%s date=%s price=%s",
                 ticker_str,
@@ -552,7 +552,7 @@ def resolve_security(
             if not best_ticker:
                 # Better way to bypass hardcoding: Derive ticker if missing from registry
                 best_ticker = derive_provider_ticker(
-                    cand.name, cand.asset_class, ProviderName.YAHOO
+                    cand.symbol, cand.asset_class, ProviderName.YAHOO
                 )
                 source = ProviderName.YAHOO
 
@@ -560,14 +560,14 @@ def resolve_security(
             price = None
             price_date = None
             if best_ticker and include_price:
-                target_date = criteria.price_on.date if criteria.price_on else None
+                target_date = criteria.price_on[0].date if criteria.price_on else None
                 price = fetch_price(best_ticker, provider=source, date=target_date)
                 price_date = target_date or date.today()
 
             return SearchResult(
                 provider=source,
-                symbol=Symbol(root=best_ticker) if best_ticker else Symbol(root=cand.name),
-                name=cand.name,
+                symbol=Symbol(root=best_ticker) if best_ticker else Symbol(root=cand.symbol),
+                name=cand.name or cand.symbol,
                 currency=cand.currency,
                 asset_class=cand.asset_class,
                 instrument_type=cand.instrument_type,
@@ -596,7 +596,7 @@ def resolve_security(
             )
             if fx_res:
                 if include_price:
-                    target_date = criteria.price_on.date if criteria.price_on else None
+                    target_date = criteria.price_on[0].date if criteria.price_on else None
                     fx_res.price = fetch_price(
                         fx_res.symbol,
                         provider=fx_res.provider or ProviderName.YAHOO,
@@ -611,7 +611,7 @@ def resolve_security(
         res = results[0]
         # Fetch price (current or historical)
         if include_price:
-            target_date = criteria.price_on.date if criteria.price_on else None
+            target_date = criteria.price_on[0].date if criteria.price_on else None
             res.price = fetch_price(
                 res.symbol, provider=res.provider or ProviderName.YAHOO, date=target_date
             )
@@ -658,7 +658,7 @@ def resolve_and_persist(
         )
         if not known_candidates:
             # It's a new discovery!
-            logger.info(f"Persisting new discovery: {res.name} ({res.symbol})")
+            logger.info(f"Persisting new discovery: {res.symbol} ({res.name})")
 
             from .registry import add_instrument
 

@@ -34,7 +34,7 @@ class InstrumentRegistry:
         self._load_errors: list[str] = []
         self._by_isin: dict[str, list[Instrument]] = {}
         self._by_figi: dict[str, Instrument] = {}
-        self._by_name: dict[str, list[Instrument]] = {}
+        self._by_symbol: dict[str, list[Instrument]] = {}
         self._by_ticker: dict[str, Instrument] = {}  # Map "PROVIDER:TICKER" -> Instrument
 
         if include_bundled:
@@ -94,12 +94,12 @@ class InstrumentRegistry:
                 self._by_isin[isin_key].insert(0, c)  # User overrides first
 
         self._by_figi = {}
-        self._by_name = {}
+        self._by_symbol = {}
         for c in self._instruments:
-            name_key = c.name.upper()
-            if name_key not in self._by_name:
-                self._by_name[name_key] = []
-            self._by_name[name_key].insert(0, c)
+            sym_key = c.symbol.upper()
+            if sym_key not in self._by_symbol:
+                self._by_symbol[sym_key] = []
+            self._by_symbol[sym_key].insert(0, c)
 
         self._by_ticker = {}
 
@@ -143,9 +143,9 @@ class InstrumentRegistry:
                 isin_matches = [c for c in isin_matches if str(c.currency).upper() == curr]
             candidates.extend(isin_matches)
 
-        # 3. Symbol/name — only when no strict identifier (ISIN/FIGI) was provided
+        # 3. Symbol — only when no strict identifier (ISIN/FIGI) was provided
         elif criteria.symbol:
-            sym_matches = self._by_name.get(str(criteria.symbol).upper(), [])
+            sym_matches = self._by_symbol.get(str(criteria.symbol).upper(), [])
             if criteria.currency:
                 curr = str(criteria.currency).upper()
                 sym_matches = [c for c in sym_matches if str(c.currency).upper() == curr]
@@ -158,11 +158,11 @@ class InstrumentRegistry:
                 return []
             candidates = [c for c in candidates if _map_asset_class(c.asset_class) == target_ac]
 
-        # Deduplicate by (name, asset_class)
+        # Deduplicate by (symbol, asset_class)
         seen: set[tuple[str, object]] = set()
         unique: list[Instrument] = []
         for c in candidates:
-            key = (c.name.upper(), c.asset_class)
+            key = (c.symbol.upper(), c.asset_class)
             if key not in seen:
                 unique.append(c)
                 seen.add(key)
@@ -205,7 +205,7 @@ def add_instrument(
     target_path: Path,
     instrument_type: InstrumentType | None = None,
     asset_class: AssetClass | None = None,
-    name: str | None = None,
+    symbol: str | None = None,
     dry_run: bool = False,
     registry: InstrumentRegistry | None = None,
     country: str | None = None,
@@ -215,7 +215,7 @@ def add_instrument(
     Adds a new instrument to the registry.
 
     Uses SecurityQuery.symbol (the raw token or security symbol).
-    Extracts base ticker (before ':') for Beancount name.
+    Extracts base ticker (before ':') for Beancount symbol.
     Stores provider-specific tickers only if found online.
     """
     if metadata:
@@ -225,14 +225,14 @@ def add_instrument(
             asset_class = metadata.asset_class
 
     # 1. Determine ticker
-    if not criteria.symbol and not name:
+    if not criteria.symbol and not symbol:
         if not metadata or not metadata.symbol:
-            raise ValueError("SecurityQuery.symbol or name is required if metadata fetch failed")
+            raise ValueError("SecurityQuery.symbol or symbol is required if metadata fetch failed")
         criteria.symbol = str(metadata.symbol)
 
-    # 2. Extract base ticker for instrument name
-    if name:
-        clean_name = name
+    # 2. Extract base ticker for instrument symbol
+    if symbol:
+        clean_symbol = symbol
     else:
         # Prefer the raw provider ticker (e.g. OpenFIGI's "CHIP" over Yahoo's "CHIP.PA")
         if metadata and metadata.ticker:
@@ -242,27 +242,27 @@ def add_instrument(
         else:
             token = str(criteria.symbol or "")
         if not token:
-            raise ValueError("Could not determine ticker for name generation")
+            raise ValueError("Could not determine ticker for symbol generation")
 
         # For CASH instruments, prefer use the name (e.g. "EUR") if it is a 3-letter code.
         is_fx = instrument_type == InstrumentType.CASH or asset_class == AssetClass.CASH
         if is_fx and metadata and metadata.name and len(str(metadata.name)) == 3:
-            clean_name = str(metadata.name)
+            clean_symbol = str(metadata.name)
         else:
-            clean_name = token.split(":")[-1]
+            clean_symbol = token.split(":")[-1]
 
     # 3. Collision check against entire registry
     if registry:
-        existing = registry.find_candidates(SecurityQuery(symbol=clean_name))
+        existing = registry.find_candidates(SecurityQuery(symbol=clean_symbol))
         for match in existing:
-            # If name matches but ISIN is different, it's a collision
+            # If symbol matches but ISIN is different, it's a collision
             # unless one of them is missing ISIN (like CASH).
-            # If both are same name, same asset class, same currency, we allow it (update).
-            # If it's a name collision with a different asset class, we warn/error.
+            # If both are same symbol, same asset class, same currency, we allow it (update).
+            # If it's a symbol collision with a different asset class, we warn/error.
             if match.asset_class != asset_class:
                 raise ValueError(
-                    f"Name collision: '{clean_name}' is already registered as {match.asset_class}. "
-                    f"Refusing to add as {asset_class}."
+                    f"Symbol collision: '{clean_symbol}' already registered as "
+                    f"{match.asset_class}. Refusing to add as {asset_class}."
                 )
 
     # 4. Build tickers dict (prefer online metadata, fallback to criteria.symbol)
@@ -283,7 +283,7 @@ def add_instrument(
             tickers_dict = {}
         tickers_dict["ibkr"] = ibkr
 
-    # 4. Create instrument
+    # 5. Create instrument
     if instrument_type is None:
         raise ValueError(
             "--instrument-type is required (could not be inferred from provider metadata)"
@@ -300,7 +300,8 @@ def add_instrument(
     )
 
     instrument = Instrument(
-        name=clean_name,
+        symbol=clean_symbol,
+        name=metadata.name if metadata else None,
         isin=criteria.isin,
         figi=metadata.figi if metadata else None,
         instrument_type=instrument_type,
@@ -308,7 +309,7 @@ def add_instrument(
         currency=comm_currency,
         tickers=Tickers(**tickers_dict) if tickers_dict else None,
         validation_points=(
-            [ValidationPoint(date=criteria.price_on.date, price=criteria.price_on.price)]
+            [ValidationPoint(date=pod.date, price=pod.price) for pod in criteria.price_on]
             if criteria.price_on
             else None
         ),
@@ -366,13 +367,13 @@ def _save_instrument_to_file(instrument: Instrument, target_path: Path, dry_run:
                 existing.get("isin") == str(instrument.isin) if instrument.isin else False
             ) and existing.get("currency") == str(instrument.currency):
                 logger.info(
-                    f"Updating existing record for {instrument.name} "
+                    f"Updating existing record for {instrument.symbol} "
                     f"({instrument.currency}) via ISIN match"
                 )
                 match = True
-            # Step 2: Fallback to Name match
-            elif existing.get("name") == instrument.name:
-                logger.info(f"Updating existing record for {instrument.name} via name match")
+            # Step 2: Fallback to symbol match
+            elif existing.get("symbol") == instrument.symbol:
+                logger.info(f"Updating existing record for {instrument.symbol} via symbol match")
                 match = True
 
             if match:
@@ -386,7 +387,7 @@ def _save_instrument_to_file(instrument: Instrument, target_path: Path, dry_run:
     existing_instruments.append(instrument.model_dump(mode="json", exclude_none=True))
     _save_to_yaml(data, existing_instruments, target_path)
 
-    logger.info(f"Auto-added {instrument.name} to {target_path}")
+    logger.info(f"Auto-added {instrument.symbol} to {target_path}")
 
 
 def _save_to_yaml(data: dict | None, instruments: list[dict], target_path: Path) -> None:

@@ -17,7 +17,7 @@ def test_invalid_isin_validation():
     """Ensure invalid ISINs are rejected by the model."""
     with pytest.raises(ValidationError, match="Invalid ISIN format"):
         Instrument(
-            name="INVALID",
+            symbol="INVALID",
             isin="SHORT",
             instrument_type=InstrumentType.ETF,
             asset_class=AssetClass.EQUITY_ETF,
@@ -28,7 +28,7 @@ def test_invalid_isin_validation():
 def test_currency_normalization():
     """Ensure currencies are handled by the model (normalization check)."""
     comm = Instrument(
-        name="TEST",
+        symbol="TEST",
         isin="US0378331005",
         instrument_type=InstrumentType.STOCK,
         asset_class=AssetClass.STOCK,
@@ -40,7 +40,7 @@ def test_currency_normalization():
 def test_idempotent_addition(temp_registry_file):
     """Adding the exact same commodity multiple times should not create duplicates."""
     comm = Instrument(
-        name="AAPL",
+        symbol="AAPL",
         isin="US0378331005",
         instrument_type=InstrumentType.STOCK,
         asset_class=AssetClass.STOCK,
@@ -55,7 +55,7 @@ def test_idempotent_addition(temp_registry_file):
         data = yaml.safe_load(f)
 
     assert len(data["instruments"]) == 1
-    assert data["instruments"][0]["name"] == "AAPL"
+    assert data["instruments"][0]["symbol"] == "AAPL"
 
 
 def test_instrument_priority_isin_currency(temp_registry_file):
@@ -67,7 +67,7 @@ def test_instrument_priority_isin_currency(temp_registry_file):
     """
     # 1. Add initial
     comm1 = Instrument(
-        name="CUSTOM_NAME",
+        symbol="CUSTOM_NAME",
         isin="US0378331005",
         instrument_type=InstrumentType.STOCK,
         asset_class=AssetClass.STOCK,
@@ -75,9 +75,9 @@ def test_instrument_priority_isin_currency(temp_registry_file):
     )
     _save_instrument_to_file(comm1, temp_registry_file)
 
-    # 2. Add with different name but same ISIN/Currency
+    # 2. Add with different symbol but same ISIN/Currency
     comm2 = Instrument(
-        name="AAPL",  # Derived name
+        symbol="AAPL",  # Derived symbol
         isin="US0378331005",
         instrument_type=InstrumentType.STOCK,
         asset_class=AssetClass.STOCK,
@@ -90,8 +90,8 @@ def test_instrument_priority_isin_currency(temp_registry_file):
 
     assert len(data["instruments"]) == 1
     # In the registry layer, it updates the record.
-    # The CLI layer is where we reuse the existing name.
-    assert data["instruments"][0]["name"] == "AAPL"
+    # The CLI layer is where we reuse the existing symbol.
+    assert data["instruments"][0]["symbol"] == "AAPL"
 
 
 def test_ticker_collision_handling(temp_registry_file):
@@ -101,7 +101,7 @@ def test_ticker_collision_handling(temp_registry_file):
     """
     # 1. Add first instrument (Apple)
     comm1 = Instrument(
-        name="SHARED",
+        symbol="SHARED",
         isin="US0378331005",
         instrument_type=InstrumentType.STOCK,
         asset_class=AssetClass.STOCK,
@@ -109,9 +109,9 @@ def test_ticker_collision_handling(temp_registry_file):
     )
     _save_instrument_to_file(comm1, temp_registry_file)
 
-    # 2. Add second instrument (Microsoft) with same name but different ISIN
+    # 2. Add second instrument (Microsoft) with same symbol but different ISIN
     comm2 = Instrument(
-        name="SHARED",
+        symbol="SHARED",
         isin="US5949181045",
         instrument_type=InstrumentType.STOCK,
         asset_class=AssetClass.STOCK,
@@ -128,12 +128,12 @@ def test_ticker_collision_handling(temp_registry_file):
 
 
 def test_cli_name_preservation(temp_registry_file):
-    """Test that CLI add command preserves existing name for same ISIN/Currency."""
+    """Test that CLI add command preserves existing symbol for same ISIN/Currency."""
     from instrument_registry.cli import main
 
-    # 1. Manually create an entry with a custom name
+    # 1. Manually create an entry with a custom symbol
     comm1 = Instrument(
-        name="CUSTOM_NAME",
+        symbol="CUSTOM_NAME",
         isin="US0378331005",
         instrument_type=InstrumentType.STOCK,
         asset_class=AssetClass.STOCK,
@@ -161,25 +161,25 @@ def test_cli_name_preservation(temp_registry_file):
         ]
     )
 
-    # 3. Verify name is still CUSTOM_NAME
+    # 3. Verify symbol is still CUSTOM_NAME
     with open(temp_registry_file) as f:
         data = yaml.safe_load(f)
 
-    assert data["instruments"][0]["name"] == "CUSTOM_NAME"
+    assert data["instruments"][0]["symbol"] == "CUSTOM_NAME"
     assert data["instruments"][0]["tickers"]["yahoo"] == "AAPL"  # Updated ticker
 
 
 def test_dual_listing_coexistence(temp_registry_file):
     """Verify that same ISIN with different currencies can coexist."""
     comm_eur = Instrument(
-        name="GDX_EUR",
+        symbol="GDX_EUR",
         isin="IE00BQQP9F84",
         instrument_type=InstrumentType.ETF,
         asset_class=AssetClass.EQUITY_ETF,
         currency="EUR",
     )
     comm_gbp = Instrument(
-        name="GDX_GBP",
+        symbol="GDX_GBP",
         isin="IE00BQQP9F84",
         instrument_type=InstrumentType.ETF,
         asset_class=AssetClass.EQUITY_ETF,

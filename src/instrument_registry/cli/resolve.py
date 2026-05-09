@@ -7,6 +7,7 @@ from typing import Any
 
 import agentyper as typer
 import pandas as pd  # type: ignore[import-untyped]
+from pydantic_market_data import AssetClass as PmdAssetClass
 from pydantic_market_data.models import (
     Currency,
     CurrencyCode,
@@ -19,6 +20,28 @@ from pydantic_market_data.models import (
 from . import common
 
 logger = logging.getLogger(__name__)
+
+_LOCAL_TO_PMD: dict[str, PmdAssetClass] = {
+    "stock": PmdAssetClass.EQUITY,
+    "equityetf": PmdAssetClass.EQUITY,
+    "fixedincomeetf": PmdAssetClass.FIXED_INCOME,
+    "moneymarketetf": PmdAssetClass.FIXED_INCOME,
+    "commodityetf": PmdAssetClass.COMMODITY,
+    "commodity": PmdAssetClass.COMMODITY,
+    "crypto": PmdAssetClass.CRYPTO,
+    "cash": PmdAssetClass.CASH,
+    "forex": PmdAssetClass.FX,
+}
+
+
+def _coerce_asset_class(raw: str | None) -> PmdAssetClass | None:
+    if not raw:
+        return None
+    try:
+        return PmdAssetClass(raw.lower().replace(" ", "_"))
+    except ValueError:
+        pass
+    return _LOCAL_TO_PMD.get(raw.lower().replace(" ", "").replace("_", ""))
 
 
 def _read_pipe() -> list[dict[str, Any]]:
@@ -92,7 +115,7 @@ def _resolve_criteria(
         figi=figi,
         currency=CurrencyCode(Currency(currency.upper())) if currency else None,
         price_on=price_on,
-        asset_class=asset_class,
+        asset_class=_coerce_asset_class(asset_class),
     )
 
     result = resolve_and_persist(
@@ -218,8 +241,8 @@ def command(
         if res_comp:
             conid_result = SearchResult(
                 provider=ProviderName.YAHOO,
-                symbol=res_comp.tickers.yahoo if res_comp.tickers else res_comp.name,
-                name=res_comp.name,
+                symbol=res_comp.tickers.yahoo if res_comp.tickers else res_comp.symbol,
+                name=res_comp.name or res_comp.symbol,
                 currency=res_comp.currency,
                 asset_class=res_comp.asset_class,
                 instrument_type=res_comp.instrument_type,
@@ -273,12 +296,19 @@ def command(
                     else None
                 )
             )
-            raw_price_on = pipe_data.get("price_on") if rec_price is None else None
+            raw_price_on_field = pipe_data.get("price_on") if rec_price is None else None
+            # Accept both a single dict and a list (pmdp >= 0.4.1 emits a list)
+            if isinstance(raw_price_on_field, list):
+                raw_price_on_field = raw_price_on_field[0] if raw_price_on_field else None
             pipe_price_on: PriceOnDate | None = None
-            if raw_price_on and raw_price_on.get("price") is not None and raw_price_on.get("date"):
+            if (
+                raw_price_on_field
+                and raw_price_on_field.get("price") is not None
+                and raw_price_on_field.get("date")
+            ):
                 pipe_price_on = PriceOnDate(
-                    price=Price(float(raw_price_on["price"])),
-                    date=pd.to_datetime(str(raw_price_on["date"])).date(),
+                    price=Price(float(raw_price_on_field["price"])),
+                    date=pd.to_datetime(str(raw_price_on_field["date"])).date(),
                 )
             _resolve_criteria(
                 ctx=ctx,

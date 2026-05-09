@@ -27,19 +27,19 @@ def test_tickers_valid():
 
 def test_instrument_minimal():
     c = Instrument(
-        name="TEST_ETF",
+        symbol="TEST_ETF",
         asset_class=AssetClass.EQUITY_ETF,
         instrument_type=InstrumentType.ETF,
         currency="USD",
     )
-    assert c.name == "TEST_ETF"
+    assert c.symbol == "TEST_ETF"
     assert str(c.currency) == "USD"
     assert c.asset_class == AssetClass.EQUITY_ETF
 
 
 def test_instrument_full():
     c = Instrument(
-        name="TEST",
+        symbol="TEST",
         isin="US0378331005",  # Valid AAPL ISIN
         instrument_type=InstrumentType.STOCK,
         asset_class=AssetClass.STOCK,
@@ -55,7 +55,7 @@ def test_instrument_full():
 def test_isin_validation():
     # Valid ISIN (Apple)
     Instrument(
-        name="AAPL",
+        symbol="AAPL",
         isin="US0378331005",
         instrument_type=InstrumentType.STOCK,
         asset_class=AssetClass.STOCK,
@@ -65,7 +65,7 @@ def test_isin_validation():
     # Invalid Length
     with pytest.raises(ValidationError, match="Invalid ISIN format"):
         Instrument(
-            name="BAD",
+            symbol="BAD",
             isin="US123",
             instrument_type=InstrumentType.STOCK,
             asset_class=AssetClass.STOCK,
@@ -75,7 +75,7 @@ def test_isin_validation():
     # Invalid Country Code
     with pytest.raises(ValidationError, match="Invalid ISIN format"):
         Instrument(
-            name="BAD",
+            symbol="BAD",
             isin="120378331005",
             instrument_type=InstrumentType.STOCK,
             asset_class=AssetClass.STOCK,
@@ -85,7 +85,7 @@ def test_isin_validation():
     # Invalid Checksum (last digit changed from 5 to 6)
     with pytest.raises(ValidationError, match="Invalid ISIN"):
         Instrument(
-            name="BAD",
+            symbol="BAD",
             isin="US0378331006",
             instrument_type=InstrumentType.STOCK,
             asset_class=AssetClass.STOCK,
@@ -96,7 +96,7 @@ def test_isin_validation():
 def test_instrument_invalid_currency():
     with pytest.raises(ValidationError):
         Instrument(
-            name="Test",
+            symbol="Test",
             asset_class=AssetClass.EQUITY_ETF,
             instrument_type=InstrumentType.ETF,
             currency="INVALID",  # Should be 3-4 chars
@@ -111,24 +111,24 @@ def test_enums():
         InstrumentType("InvalidType")
 
 
-def test_instrument_name_relaxed():
+def test_instrument_symbol_relaxed():
     # Test symbols that were previously invalid under Beancount rules
-    valid_names = ["^GSPC", "EURUSD=X", "BTC-USD", "4GLD.DE", "ETH:USD", "123"]
-    for name in valid_names:
+    valid_symbols = ["^GSPC", "EURUSD=X", "BTC-USD", "4GLD.DE", "ETH:USD", "123"]
+    for sym in valid_symbols:
         c = Instrument(
-            name=name,
+            symbol=sym,
             asset_class=AssetClass.STOCK,
             instrument_type=InstrumentType.STOCK,
             currency="USD",
         )
-        assert c.name == name
+        assert c.symbol == sym
 
-    # Test invalid names (containing whitespace)
-    invalid_names = ["AAPL ", " AAPL", "AAPL Ticker"]
-    for name in invalid_names:
+    # Test invalid symbols (containing whitespace)
+    invalid_symbols = ["AAPL ", " AAPL", "AAPL Ticker"]
+    for sym in invalid_symbols:
         with pytest.raises(ValidationError):
             Instrument(
-                name=name,
+                symbol=sym,
                 asset_class=AssetClass.STOCK,
                 instrument_type=InstrumentType.STOCK,
                 currency="USD",

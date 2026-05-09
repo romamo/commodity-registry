@@ -35,23 +35,19 @@ class AssetClass(str, Enum):
     COMMODITY = "Commodity"
 
 
-_ASSET_CLASS_MAP: list[tuple[str, AssetClass]] = []
-
-
-def _get_asset_class_map() -> list[tuple[str, AssetClass]]:
-    """Lazy-load the asset class mapping."""
-    global _ASSET_CLASS_MAP
-    if not _ASSET_CLASS_MAP:
-        _ASSET_CLASS_MAP = [
-            ("ETF", AssetClass.EQUITY_ETF),
-            ("STOCK", AssetClass.STOCK),
-            ("EQUITY", AssetClass.STOCK),
-            ("CRYPTO", AssetClass.CRYPTO),
-            ("FOREX", AssetClass.CASH),
-            ("CASH", AssetClass.CASH),
-            ("CURRENCY", AssetClass.CASH),
-        ]
-    return _ASSET_CLASS_MAP
+_ASSET_CLASS_MAP: list[tuple[str, AssetClass]] = [
+    ("ETF", AssetClass.EQUITY_ETF),
+    ("FIXED_INCOME", AssetClass.FIXED_INCOME_ETF),
+    ("STOCK", AssetClass.STOCK),
+    ("EQUITY", AssetClass.STOCK),
+    ("INDEX", AssetClass.STOCK),
+    ("COMMODITY", AssetClass.COMMODITY),
+    ("CRYPTO", AssetClass.CRYPTO),
+    ("FOREX", AssetClass.CASH),
+    ("CASH", AssetClass.CASH),
+    ("CURRENCY", AssetClass.CASH),
+    ("FX", AssetClass.CASH),
+]
 
 
 def _map_asset_class(raw: str | AssetClass | None) -> AssetClass | None:
@@ -61,8 +57,9 @@ def _map_asset_class(raw: str | AssetClass | None) -> AssetClass | None:
     if isinstance(raw, AssetClass):
         return raw
 
-    upper = str(raw).upper()
-    for keyword, aclass in _get_asset_class_map():
+    # Use the string value directly (.upper() on str subclasses like pmd.AssetClass uses the value)
+    upper = raw.upper()
+    for keyword, aclass in _ASSET_CLASS_MAP:
         if keyword in upper:
             return aclass
     return None
@@ -94,7 +91,8 @@ class ValidationPoint(BaseModel):
 
 
 class Instrument(BaseModel):
-    name: str = Field(..., description="Canonical financial symbol", pattern=r"^\S+$")
+    symbol: str = Field(..., description="Canonical financial symbol", pattern=r"^\S+$")
+    name: str | None = None
     isin: ISIN.Input | None = None
     figi: str | None = Field(None, description="Composite FIGI identifier")
 

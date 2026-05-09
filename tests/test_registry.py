@@ -17,7 +17,7 @@ def temp_registry_dir(tmp_path):
     base_data = {
         "instruments": [
             {
-                "name": "AAPL",
+                "symbol": "AAPL",
                 "isin": "US0378331005",
                 "asset_class": "Stock",
                 "instrument_type": "Stock",
@@ -25,7 +25,7 @@ def temp_registry_dir(tmp_path):
                 "tickers": {"yahoo": "AAPL"},
             },
             {
-                "name": "XAID",
+                "symbol": "XAID",
                 "isin": "GB00B00FHZ82",
                 "asset_class": "CommodityETF",
                 "instrument_type": "ETF",
@@ -44,31 +44,31 @@ def test_registry_loading(temp_registry_dir):
     reg = InstrumentRegistry(extra_paths=[temp_registry_dir], include_bundled=False)
     all_instruments = reg.get_all()
     assert len(all_instruments) == 2
-    assert any(c.name == "AAPL" for c in all_instruments)
-    assert any(c.name == "XAID" for c in all_instruments)
+    assert any(c.symbol == "AAPL" for c in all_instruments)
+    assert any(c.symbol == "XAID" for c in all_instruments)
 
 
 def test_find_by_isin(temp_registry_dir):
     reg = InstrumentRegistry(extra_paths=[temp_registry_dir], include_bundled=False)
     c = reg.find_by_isin("US0378331005")
     assert c is not None
-    assert c.name == "AAPL"
+    assert c.symbol == "AAPL"
 
 
-def test_find_candidates_by_name(temp_registry_dir):
+def test_find_candidates_by_symbol(temp_registry_dir):
     from pydantic_market_data.models import SecurityQuery
 
     reg = InstrumentRegistry(extra_paths=[temp_registry_dir], include_bundled=False)
     candidates = reg.find_candidates(SecurityQuery(symbol="AAPL"))
     assert len(candidates) == 1
-    assert candidates[0].name == "AAPL"
+    assert candidates[0].symbol == "AAPL"
 
 
 def test_find_by_ticker(temp_registry_dir):
     reg = InstrumentRegistry(extra_paths=[temp_registry_dir], include_bundled=False)
     c = reg.find_by_ticker("yahoo", "XAID.L")
     assert c is not None
-    assert c.name == "XAID"
+    assert c.symbol == "XAID"
 
 
 def test_registry_merging(temp_registry_dir):
@@ -77,7 +77,7 @@ def test_registry_merging(temp_registry_dir):
     override_data = {
         "instruments": [
             {
-                "name": "AAPL",
+                "symbol": "AAPL",
                 "isin": "US0378331005",
                 "asset_class": "Stock",
                 "instrument_type": "Stock",
@@ -109,7 +109,7 @@ def test_registry_prefers_user_entries_for_name_lookups(tmp_path):
             {
                 "instruments": [
                     {
-                        "name": "AAPL",
+                        "symbol": "AAPL",
                         "isin": "US0378331005",
                         "asset_class": "Stock",
                         "instrument_type": "Stock",
@@ -129,7 +129,7 @@ def test_registry_prefers_user_entries_for_name_lookups(tmp_path):
             {
                 "instruments": [
                     {
-                        "name": "AAPL",
+                        "symbol": "AAPL",
                         "isin": "US0378331005",
                         "asset_class": "Stock",
                         "instrument_type": "Stock",
@@ -161,7 +161,7 @@ def test_recursive_loading(temp_registry_dir):
     nested_data = {
         "instruments": [
             {
-                "name": "NESTED",
+                "symbol": "NESTED",
                 "isin": "US0378331005",  # Valid ISIN (reused AAPL for validity)
                 "asset_class": "Stock",
                 "instrument_type": "Stock",
@@ -177,7 +177,7 @@ def test_recursive_loading(temp_registry_dir):
 
     c = reg.find_candidates(SecurityQuery(symbol="NESTED"))
     assert len(c) == 1
-    assert c[0].name == "NESTED"
+    assert c[0].symbol == "NESTED"
 
 
 def test_find_by_figi(temp_registry_dir):
@@ -186,7 +186,7 @@ def test_find_by_figi(temp_registry_dir):
     figi_data = {
         "instruments": [
             {
-                "name": "FIGI_STOCK",
+                "symbol": "FIGI_STOCK",
                 "isin": "US0378331005",
                 "figi": "BBG000B9XRY4",
                 "asset_class": "Stock",
@@ -200,7 +200,7 @@ def test_find_by_figi(temp_registry_dir):
 
     reg = InstrumentRegistry(extra_paths=[temp_registry_dir], include_bundled=False)
     assert reg._by_figi.get("BBG000B9XRY4") is not None
-    assert reg._by_figi["BBG000B9XRY4"].name == "FIGI_STOCK"
+    assert reg._by_figi["BBG000B9XRY4"].symbol == "FIGI_STOCK"
 
 
 def test_duplicate_yaml_key(temp_registry_dir):
@@ -231,7 +231,7 @@ def test_add_instrument_no_sanitization(tmp_path):
         asset_class=AssetClass.STOCK,
     )
 
-    assert c.name == "^GSPC"
+    assert c.symbol == "^GSPC"
 
     # Test with provider prefix - should extract only ticker part
     criteria_2 = SecurityQuery(symbol="YAHOO:EURUSD=X", currency="USD")
@@ -242,4 +242,4 @@ def test_add_instrument_no_sanitization(tmp_path):
         instrument_type=InstrumentType.CASH,
         asset_class=AssetClass.CASH,
     )
-    assert c2.name == "EURUSD=X"
+    assert c2.symbol == "EURUSD=X"

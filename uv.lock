@@ -500,7 +500,7 @@ wheels = [
 
 [[package]]
 name = "instrument-registry"
-version = "0.2.10"
+version = "0.2.11"
 source = { editable = "." }
 dependencies = [
     { name = "agentyper" },
@@ -537,7 +537,7 @@ requires-dist = [
     { name = "py-openfigi2", marker = "extra == 'providers'", specifier = ">=0.1.2" },
     { name = "py-yfinance", marker = "extra == 'providers'", specifier = ">=0.1.16" },
     { name = "pydantic", specifier = "==2.13.4" },
-    { name = "pydantic-market-data", specifier = ">=0.3.2" },
+    { name = "pydantic-market-data", specifier = ">=0.4.0" },
     { name = "pyyaml", specifier = ">=6.0" },
 ]
 provides-extras = ["providers"]
@@ -1405,7 +1405,7 @@ wheels = [
 
 [[package]]
 name = "pydantic-market-data"
-version = "0.3.2"
+version = "0.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -1415,9 +1415,9 @@ dependencies = [
     { name = "pydantic-extra-types" },
     { name = "pydantic-settings" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c0/0a/cfdcc9e25d93d5556e480bc87f0c8a01c905c5939f39dad7d9abd43aa42e/pydantic_market_data-0.3.2.tar.gz", hash = "sha256:7083fe0e73877994ab467f17e5741af5859952b484fb6187f3d260529399f7bd", size = 15554, upload-time = "2026-05-08T09:32:32.753Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c3/3e/bc976134278580bfe55f711141d390109522dfd8f57325958f039148b168/pydantic_market_data-0.4.1.tar.gz", hash = "sha256:daa5e64fcbaea1eb18ed179cc94eae0b1875625c1ed5c1351ca813f4e18dc77f", size = 15988, upload-time = "2026-05-09T09:45:21.378Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9c/64/bb7cfb3e16a3d9da9babe224da40c23e461b0e78f88274b55d897125d92b/pydantic_market_data-0.3.2-py3-none-any.whl", hash = "sha256:d31318746c9e91d7feef729ffe94f8d59a68a258857b6aa16aad7ce795f0dcba", size = 10011, upload-time = "2026-05-08T09:32:31.876Z" },
+    { url = "https://files.pythonhosted.org/packages/37/6c/18de881a50a0e60d08d7cee4338800e19ba01204780e76941a30a41dd271/pydantic_market_data-0.4.1-py3-none-any.whl", hash = "sha256:dda36c94cdaeaafbebc548c737aa1fe205efcf109f27326ddf78481e259c9890", size = 10226, upload-time = "2026-05-09T09:45:20.431Z" },
 ]
 
 [[package]]

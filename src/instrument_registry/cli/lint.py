@@ -74,26 +74,26 @@ def command(
 
     seen_isinc: dict[tuple[str, str], str] = {}
     for instrument in instruments:
-        checked_names.append(instrument.name)
+        checked_names.append(instrument.symbol)
         instrument_ok = True
         if instrument.isin:
             key = (str(instrument.isin).upper(), str(instrument.currency).upper())
             if key in seen_isinc:
                 errors.append(
                     f"Duplicate ISIN {instrument.isin} with currency {instrument.currency} in "
-                    f"{instrument.name} and {seen_isinc[key]}"
+                    f"{instrument.symbol} and {seen_isinc[key]}"
                 )
                 instrument_ok = False
-            seen_isinc[key] = instrument.name
+            seen_isinc[key] = instrument.symbol
         if common.STATE.debug:
             status_lbl = "OK" if instrument_ok else "FAILED"
             if fmt == "table":
-                print(f"{instrument.name}: {status_lbl}")
+                print(f"{instrument.symbol}: {status_lbl}")
             elif fmt == "json":
                 common.emit_json_event(
                     {
                         "event": "instrument_checked",
-                        "name": instrument.name,
+                        "symbol": instrument.symbol,
                         "status": status_lbl,
                     }
                 )
@@ -101,7 +101,7 @@ def command(
     if verify:
         targets = instruments
         if only:
-            targets = [instrument for instrument in targets if instrument.name == only]
+            targets = [instrument for instrument in targets if instrument.symbol == only]
             if not targets:
                 common.exit_with_error(f"Instrument '{only}' not found.")
 
@@ -129,7 +129,7 @@ def command(
 
                 if not ext_data:
                     audit_log.append(f"  [!] FAILED: No external data found for {ticker}")
-                    warnings.append(f"{instrument.name}: No external metadata found")
+                    warnings.append(f"{instrument.symbol}: No external metadata found")
                     success = False
                 else:
                     ext_isin = ext_data.isin if hasattr(ext_data, "isin") else None
@@ -139,7 +139,7 @@ def command(
                                 f"  ISIN:     {instrument.isin} [MISMATCH: {ext_isin}]"
                             )
                             warnings.append(
-                                f"{instrument.name}: ISIN mismatch (Registry: {instrument.isin}, "
+                                f"{instrument.symbol}: ISIN mismatch (Registry: {instrument.isin}, "
                                 f"Provider: {ext_isin})"
                             )
                             success = False
@@ -156,7 +156,7 @@ def command(
                         if ticker.upper() != str(ext_symbol).upper():
                             audit_log.append(f"  Ticker:   {ticker} [MISMATCH: {ext_symbol}]")
                             warnings.append(
-                                f"{instrument.name}: Ticker mismatch (Registry: {ticker}, "
+                                f"{instrument.symbol}: Ticker mismatch (Registry: {ticker}, "
                                 f"Provider: {ext_symbol})"
                             )
                             success = False
@@ -183,7 +183,7 @@ def command(
                     )
                     audit_log.append(f"  Currency: {instrument.currency} {status_curr}")
                     if "MISMATCH" in status_curr:
-                        warnings.append(f"{instrument.name}: Currency mismatch")
+                        warnings.append(f"{instrument.symbol}: Currency mismatch")
                         success = False
 
                     if instrument.figi:
@@ -233,7 +233,7 @@ def command(
                                 success = False
                                 audit_log.extend(vp_log)
                                 warnings.append(
-                                    f"{instrument.name}: Price verification failed on "
+                                    f"{instrument.symbol}: Price verification failed on "
                                     f"{validation_point.date}"
                                 )
                             else:
@@ -244,12 +244,12 @@ def command(
                         )
 
                 status_lbl = "OK" if success else "FAILED"
-                print(f"{instrument.name}({provider.value} {ticker}): {status_lbl}")
+                print(f"{instrument.symbol}({provider.value} {ticker}): {status_lbl}")
                 if not success or common.STATE.debug:
                     for line in audit_log:
                         print(line)
             else:
-                print(f"{instrument.name}: [SKIPPED: No compatible ticker]")
+                print(f"{instrument.symbol}: [SKIPPED: No compatible ticker]")
 
     lint_report = {
         "target": target_desc,
