@@ -94,12 +94,11 @@ def test_instrument_priority_isin_currency(temp_registry_file):
     assert data["instruments"][0]["symbol"] == "AAPL"
 
 
-def test_ticker_collision_handling(temp_registry_file):
+def test_same_symbol_different_isin_replaces_existing(temp_registry_file):
     """
-    Adding two different instruments (different ISINs) that happen to share a name
-    or ticker should be handled.
+    Two instruments with the same symbol but different ISINs: the second write
+    replaces the first because _save_instrument_to_file matches on symbol.
     """
-    # 1. Add first instrument (Apple)
     comm1 = Instrument(
         symbol="SHARED",
         isin="US0378331005",
@@ -109,7 +108,6 @@ def test_ticker_collision_handling(temp_registry_file):
     )
     _save_instrument_to_file(comm1, temp_registry_file)
 
-    # 2. Add second instrument (Microsoft) with same symbol but different ISIN
     comm2 = Instrument(
         symbol="SHARED",
         isin="US5949181045",
@@ -122,7 +120,6 @@ def test_ticker_collision_handling(temp_registry_file):
     with open(temp_registry_file) as f:
         data = yaml.safe_load(f)
 
-    # Since name matches, it updates the existing record
     assert len(data["instruments"]) == 1
     assert data["instruments"][0]["isin"] == "US5949181045"
 

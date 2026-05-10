@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.12] - 2026-05-10
+
+### Changed
+- **CLI output unified via `typer.output()`**: All commands (`add`, `fetch`, `lint`, `resolve`) now emit results through `typer.output()` directly, removing the `emit_structured()` helper and consolidating format dispatch.
+- **`exit_with_error` simplified**: Delegates fully to `typer.exit_error()` regardless of format — no duplicate logger call.
+- **`resolve` error handling**: Internal `ResolutionFailed` exception replaces direct `exit_with_error()` calls inside `_resolve_criteria`, enabling clean propagation and consistent error output via a single handler at the command level.
+- **`current_format` fix**: Removed the `explicit` guard so format is respected even when not explicitly set on the context.
+
+### Dependencies
+- `agentyper` bumped to `>=0.1.13`
+
+### Internal
+- pytest `testpaths` and `norecursedirs` configured in `pyproject.toml`
+
 ## [0.2.11] - 2026-05-09
 
 ### Changed

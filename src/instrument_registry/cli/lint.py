@@ -261,26 +261,6 @@ def command(
         "warnings": warnings,
         "verified": verify,
     }
-    if fmt in {"json", "yaml"}:
-        typer.output(lint_report, format_=fmt, title="Lint Report")
-        if errors:
-            raise SystemExit(1)
-        return
-
+    typer.output(lint_report, title="Lint Report")
     if errors:
-        for err in errors:
-            logger.error("Validation Error: %s", err)
         raise SystemExit(1)
-
-    if warnings:
-        for warning in warnings:
-            logger.warning("Validation Warning: %s", warning)
-
-    if common.STATE.debug:
-        return
-    elif common.STATE.verbose:
-        summary = (
-            f"Linted {len(instruments)} instrument(s) from {target_desc}: "
-            f"{len(errors)} error(s), {len(warnings)} warning(s)."
-        )
-        print(summary)

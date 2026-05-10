@@ -77,7 +77,7 @@ def test_cli_registry_path_before_subcommand_is_not_supported(mock_log, mock_get
                 ]
             )
 
-    assert exc.value.code == 3
+    assert exc.value.code == 3  # ARG_ERROR — argparse rejects the unknown flag before dispatch
     assert mock_add.call_count == 0
 
 
@@ -119,35 +119,16 @@ def test_cli_registry_path_after_subcommand_reaches_write_target(mock_log, mock_
 
 @patch("instrument_registry.cli.common.get_registry")
 @patch("instrument_registry.cli.common.setup_logging")
-def test_cli_lint_basic(mock_log, mock_get_reg, capsys):
+def test_cli_lint_empty_registry(mock_log, mock_get_reg, capsys):
     mock_reg = MagicMock()
     mock_reg.get_all.return_value = []
     mock_reg.load_errors = []
     mock_get_reg.return_value = mock_reg
 
-    main(["lint"])
+    main(["lint", "--format", "json"])
     captured = capsys.readouterr()
-    assert captured.out == ""
-    assert captured.err == ""
-
-
-@patch("instrument_registry.cli.common.get_registry")
-@patch("instrument_registry.cli.common.setup_logging")
-def test_cli_lint_verbose_summary(mock_log, mock_get_reg, capsys):
-    mock_instrument = MagicMock()
-    mock_instrument.symbol = "AAPL"
-    mock_instrument.isin = "US0378331005"
-    mock_instrument.currency = "USD"
-
-    mock_reg = MagicMock()
-    mock_reg.get_all.return_value = [mock_instrument]
-    mock_reg.load_errors = []
-    mock_get_reg.return_value = mock_reg
-
-    main(["-v", "lint", "--format", "table"])
-
-    captured = capsys.readouterr()
-    assert "Linted 1 instrument(s) from registry: 0 error(s), 0 warning(s)." in captured.out
+    assert '"instrument_count": 0' in captured.out
+    assert '"error_count": 0' in captured.out
 
 
 @patch("instrument_registry.cli.common.get_registry")
@@ -191,6 +172,7 @@ def test_cli_lint_json_output(mock_log, mock_get_reg, capsys):
 
     captured = capsys.readouterr()
     assert '"instrument_count": 1' in captured.out
+    assert '"error_count": 0' in captured.out
     assert '"checked": [' in captured.out
     assert '"AAPL"' in captured.out
 
@@ -231,6 +213,7 @@ def test_cli_add_success(mock_add, mock_search, mock_registry, capsys):
 
     mock_comm = MagicMock()
     mock_comm.symbol = "AAPL"
+    mock_comm.model_dump.return_value = {"symbol": "AAPL"}
     mock_add.return_value = mock_comm
 
     args = [
@@ -248,10 +231,10 @@ def test_cli_add_success(mock_add, mock_search, mock_registry, capsys):
         "--fetch",
     ]
 
-    main([*args[1:], "--format", "table"])
+    main([*args[1:], "--format", "json"])
 
     mock_add.assert_called_once()
-    assert "Successfully processed AAPL" in capsys.readouterr().out
+    assert "AAPL" in capsys.readouterr().out
 
 
 @patch("instrument_registry.finder.get_available_providers", return_value=[ProviderName.YAHOO])
@@ -261,11 +244,11 @@ def test_cli_fetch_success(mock_resolve, mock_get_available_providers, capsys):
         provider=ProviderName.YAHOO, symbol="AAPL", name="Apple Inc.", currency=Currency("USD")
     )
 
-    main(["fetch", "--symbol", "AAPL", "--format", "table"])
+    main(["fetch", "--symbol", "AAPL", "--format", "json"])
 
     captured = capsys.readouterr()
-    assert "Found Details (YAHOO)" in captured.out
-    assert "Ticker:   AAPL" in captured.out
+    assert "AAPL" in captured.out
+    assert "Apple Inc." in captured.out
     assert mock_resolve.call_args.kwargs["registry"] is not None
 
 
@@ -334,6 +317,7 @@ def test_cli_add_uses_env_write_target(mock_add, mock_search, mock_registry, mon
     mock_search.return_value = []
     mock_comm = MagicMock()
     mock_comm.symbol = "AAPL"
+    mock_comm.model_dump.return_value = {"symbol": "AAPL"}
     mock_add.return_value = mock_comm
     monkeypatch.setenv("INSTRUMENT_REGISTRY_PATH", str(mock_registry))
 
@@ -349,11 +333,11 @@ def test_cli_add_uses_env_write_target(mock_add, mock_search, mock_registry, mon
         "USD",
     ]
 
-    main([*args[1:], "--format", "table"])
+    main([*args[1:], "--format", "json"])
 
     mock_add.assert_called_once()
     assert str(mock_add.call_args.kwargs["target_path"]).endswith("manual.yaml")
-    assert "Successfully processed AAPL" in capsys.readouterr().out
+    assert "AAPL" in capsys.readouterr().out
 
 
 @patch("instrument_registry.finder.get_available_providers", return_value=[ProviderName.YAHOO])
@@ -404,7 +388,7 @@ def test_cli_lint_with_verify(
     output = capsys.readouterr().out
     assert "AAPL(yahoo AAPL): OK" in output
     assert "ISIN:     US0378331005 [OK]" in output
-    assert "Price:    150.0" in output or "OK: Range Match" in output
+    assert "OK: Range Match" in output
 
 
 @patch("instrument_registry.finder.get_available_providers", return_value=[ProviderName.YAHOO])
@@ -451,17 +435,20 @@ def test_cli_lint_verify_requires_providers(mock_get_available_providers, mock_r
 @patch("instrument_registry.finder.resolve_security")
 def test_cli_fetch_with_price(mock_resolve, mock_price, mock_get_available_providers, capsys):
     """Test fetch command with price fetching enabled."""
+    from pydantic_market_data.models import Price
+
     mock_resolve.return_value = SearchResult(
         provider=ProviderName.YAHOO, symbol="AAPL", name="Apple Inc.", currency=Currency("USD")
     )
-    mock_price.return_value = 150.0
+    mock_price.return_value = Price(150.0)
 
     args = ["instrument-reg", "fetch", "--symbol", "AAPL", "--price"]
 
-    main([*args[1:], "--format", "table"])
+    main([*args[1:], "--format", "json"])
 
     output = capsys.readouterr().out
-    assert "Price:    150.0" in output
+    assert "AAPL" in output
+    assert "150" in output
 
 
 @patch("instrument_registry.finder.resolve_and_persist")

@@ -179,8 +179,6 @@ def command(
             country=country,
             ibkr=ibkr,
         )
-        if common.emit_structured(instrument):
-            return
-        print(f"Successfully processed {instrument.symbol}")
+        typer.output(instrument)
     except ValueError as exc:
         common.exit_with_error(str(exc))

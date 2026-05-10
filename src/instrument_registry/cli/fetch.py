@@ -61,16 +61,4 @@ def command(
         if fetched_price is not None:
             res.price = fetched_price
 
-    if common.emit_structured(res):
-        return
-
-    print(f"\nFound Details ({res.provider.value.upper()}):")
-    print(f"  Ticker:   {str(res.symbol)}")
-    print(f"  Name:     {res.name}")
-    print(f"  Currency: {res.currency if res.currency else 'None'}")
-
-    if price:
-        if res.price:
-            print(f"  Price:    {res.price}")
-        else:
-            print("  Price:    [Unavailable]")
+    typer.output(res)

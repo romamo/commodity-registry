@@ -21,6 +21,11 @@ from . import common
 
 logger = logging.getLogger(__name__)
 
+
+class ResolutionFailed(Exception):
+    pass
+
+
 _LOCAL_TO_PMD: dict[str, PmdAssetClass] = {
     "stock": PmdAssetClass.EQUITY,
     "equityetf": PmdAssetClass.EQUITY,
@@ -130,11 +135,11 @@ def _resolve_criteria(
     if not result:
         providers = get_available_providers()
         if not providers:
-            common.exit_with_error(
+            raise ResolutionFailed(
                 f"Could not resolve '{query_label}'. Install providers: uv tool install "
                 "'instrument-registry[providers]'"
             )
-        common.exit_with_error(f"Could not resolve '{query_label}'")
+        raise ResolutionFailed(f"Could not resolve '{query_label}'")
     assert result is not None
 
     res, new_instrument = result
@@ -144,34 +149,23 @@ def _resolve_criteria(
         v_date = pd.to_datetime(date).date()
         try:
             if verify_ticker(res.symbol, v_date, price, provider=res.provider):
-                if ctx.format_ == "table":
-                    print(f"  [OK] Verified {res.name} via {res.provider.upper()} ({res.symbol})")
+                typer.echo(f"  [OK] Verified {res.name} via {res.provider.upper()} ({res.symbol})")
             else:
-                common.exit_with_error(
+                raise ResolutionFailed(
                     f"  [!] FAILED: Price {price} on {date} does not match {res.symbol}"
                 )
         except PriceVerificationError as exc:
-            common.exit_with_error(f"  [!] FAILED: {exc}")
+            raise ResolutionFailed(f"  [!] FAILED: {exc}") from exc
 
     if new_instrument is None:
         _candidates = reg.find_candidates(criteria)
-        if _candidates and common.emit_structured(_candidates[0]):
+        if _candidates:
+            typer.output(_candidates[0])
             return
     else:
-        if common.emit_structured(new_instrument):
-            return
-    if common.emit_structured(res):
+        typer.output(new_instrument)
         return
-
-    p_val = getattr(res.price, "value", res.price) if res.price else 0.0
-    p_label = f"Price {res.price_date}" if res.price_date else "Last Price"
-    price_str = f" [{p_label}: {p_val:.2f} {res.currency}]" if res.price else ""
-    country_str = f" | Country: {res.country}" if res.country else ""
-    meta_str = f" | Meta: {res.metadata}" if res.metadata else ""
-    provider_str = f" ({res.provider.value})" if res.provider else ""
-    print(
-        f"Resolved: {res.name} -> {str(res.symbol)}{provider_str}{price_str}{country_str}{meta_str}"
-    )
+    typer.output(res)
 
 
 def command(
@@ -248,31 +242,29 @@ def command(
                 instrument_type=res_comp.instrument_type,
                 country=res_comp.country,
             )
-            if common.emit_structured(conid_result):
-                return
-            print(
-                "Resolved (via IBKR conid): "
-                f"{conid_result.name} -> {str(conid_result.symbol)} (IBKR:{query})"
-            )
+            typer.output(conid_result)
             return
 
     if query is not None:
         isin = query if common.is_isin(query) else None
         symbol = query if not isin else None
-        _resolve_criteria(
-            ctx=ctx,
-            isin=isin,
-            symbol=symbol,
-            figi=figi,
-            currency=currency,
-            asset_class=asset_class,
-            price=price,
-            date=date,
-            dry_run=no_save,
-            report_price=report_price,
-            reg=reg,
-            target_path=target_path,
-        )
+        try:
+            _resolve_criteria(
+                ctx=ctx,
+                isin=isin,
+                symbol=symbol,
+                figi=figi,
+                currency=currency,
+                asset_class=asset_class,
+                price=price,
+                date=date,
+                dry_run=no_save,
+                report_price=report_price,
+                reg=reg,
+                target_path=target_path,
+            )
+        except ResolutionFailed as exc:
+            common.exit_with_error(str(exc))
     else:
         if sys.stdin.isatty():
             common.exit_with_error("No query provided", error_type="ArgError")
@@ -310,18 +302,21 @@ def command(
                     price=Price(float(raw_price_on_field["price"])),
                     date=pd.to_datetime(str(raw_price_on_field["date"])).date(),
                 )
-            _resolve_criteria(
-                ctx=ctx,
-                isin=pipe_data.get("isin"),
-                symbol=pipe_data.get("symbol"),
-                figi=figi or pipe_data.get("figi"),
-                currency=currency or pipe_data.get("currency"),
-                asset_class=asset_class or pipe_data.get("asset_class"),
-                price=rec_price,
-                date=rec_date,
-                price_on=pipe_price_on,
-                dry_run=no_save,
-                report_price=report_price,
-                reg=reg,
-                target_path=target_path,
-            )
+            try:
+                _resolve_criteria(
+                    ctx=ctx,
+                    isin=pipe_data.get("isin"),
+                    symbol=pipe_data.get("symbol"),
+                    figi=figi or pipe_data.get("figi"),
+                    currency=currency or pipe_data.get("currency"),
+                    asset_class=asset_class or pipe_data.get("asset_class"),
+                    price=rec_price,
+                    date=rec_date,
+                    price_on=pipe_price_on,
+                    dry_run=no_save,
+                    report_price=report_price,
+                    reg=reg,
+                    target_path=target_path,
+                )
+            except ResolutionFailed as exc:
+                logger.error("%s", exc)

@@ -19,21 +19,24 @@ def test_cli_resolve_success(mock_resolve, capsys):
     )
 
     try:
-        main(["resolve", "AAPL", "--format", "table"])
+        main(["resolve", "AAPL", "--format", "json"])
     except SystemExit as e:
         assert getattr(e, "code", 0) == 0
 
     captured = capsys.readouterr()
-    assert "Resolved: Apple Inc. -> AAPL (yahoo)" in captured.out
+    assert "Apple Inc." in captured.out
+    assert "AAPL" in captured.out
 
 
 @patch("instrument_registry.finder.resolve_and_persist")
-def test_cli_resolve_not_found(mock_resolve):
+def test_cli_resolve_not_found(mock_resolve, capsys):
     mock_resolve.return_value = None
 
     with pytest.raises(SystemExit) as exc:
-        main(["resolve", "INVALIDTICKER"])
+        main(["resolve", "INVALIDTICKER", "--format", "json"])
     assert exc.value.code == 1
+    err = capsys.readouterr().err
+    assert "INVALIDTICKER" in err
 
 
 @patch("instrument_registry.finder.resolve_and_persist")
@@ -53,9 +56,11 @@ def test_cli_resolve_single_json_pipe(mock_resolve, capsys):
         patch("sys.stdin.isatty", return_value=False),
         patch("sys.stdin.read", return_value='{"isin": "US0378331005", "symbol": "AAPL"}'),
     ):
-        main(["resolve", "--format", "table"])
+        main(["resolve", "--format", "json"])
 
-    assert "Resolved: Apple Inc. -> AAPL (yahoo)" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "Apple Inc." in out
+    assert "AAPL" in out
     assert mock_resolve.call_count == 1
 
 
@@ -91,7 +96,7 @@ def test_cli_resolve_jsonl_pipe_multiple_records(mock_resolve, capsys):
         patch("sys.stdin.isatty", return_value=False),
         patch("sys.stdin.read", return_value=jsonl),
     ):
-        main(["resolve", "--format", "table"])
+        main(["resolve", "--format", "json"])
 
     out = capsys.readouterr().out
     assert "Apple Inc." in out

@@ -81,7 +81,7 @@ def current_format() -> str:
         ctx = None
     if ctx is not None:
         format_ = getattr(ctx, "format_", None)
-        if isinstance(format_, str) and format_ and explicit:
+        if isinstance(format_, str) and format_:
             return format_
     return "table"
 
@@ -114,14 +114,6 @@ def explicit_verbosity(args: list[str] | None = None) -> int:
     return verbosity
 
 
-def emit_structured(data: Any, title: str = "") -> bool:
-    fmt = current_format()
-    if fmt in {"json", "yaml"}:
-        typer.output(data, format_=fmt, title=title)
-        return True
-    return False
-
-
 def emit_json_event(data: Any) -> bool:
     if current_format() != "json":
         return False
@@ -130,11 +122,7 @@ def emit_json_event(data: Any) -> bool:
 
 
 def exit_with_error(message: str, code: int = 1, error_type: str = "ValidationError") -> None:
-    fmt = current_format()
-    if fmt in {"json", "yaml"}:
-        typer.exit_error(message, code=code, error_type=error_type, format_=fmt)
-    logger.error(message)
-    raise SystemExit(code)
+    typer.exit_error(message, code=code, error_type=error_type, format_=current_format())
 
 
 def split_registry_paths(registry_path: list[str] | None) -> list[str]:
